@@ -287,12 +287,15 @@ const FoolGame = ({ user, socket }) => {
   const [roomId, setRoomId] = useState('');
   const [betAmount, setBetAmount] = useState(100);
   const [gamePhase, setGamePhase] = useState('lobby');
-  const [isConnected, setIsConnected] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState('connecting');
   const [error, setError] = useState('');
 
   // Обработка сообщений от сервера
   useEffect(() => {
-    if (!socket) return;
+    if (!socket) {
+      setError('Нет подключения к серверу');
+      return;
+    }
     
     console.log('Настройка обработчиков событий сокета');
     
@@ -324,13 +327,19 @@ const FoolGame = ({ user, socket }) => {
     
     const handleConnect = () => {
       console.log('Подключено к серверу');
-      setIsConnected(true);
+      setConnectionStatus('connected');
       setError('');
+      
+      // Отправляем данные пользователя после подключения
+      if (user) {
+        console.log('Отправка данных пользователя на сервер');
+        socket.emit('user_login', user);
+      }
     };
     
     const handleDisconnect = () => {
       console.log('Отключено от сервера');
-      setIsConnected(false);
+      setConnectionStatus('disconnected');
       setError('Отключено от сервера. Попытка переподключения...');
     };
     
@@ -342,12 +351,6 @@ const FoolGame = ({ user, socket }) => {
     socket.on('player_disconnected', handlePlayerDisconnected);
     socket.on('error', handleSocketError);
     
-    // Отправляем данные пользователя после подключения
-    if (isConnected && user) {
-      console.log('Отправка данных пользователя на сервер');
-      socket.emit('user_login', user);
-    }
-    
     // Очистка обработчиков при размонтировании
     return () => {
       socket.off('connect', handleConnect);
@@ -357,11 +360,11 @@ const FoolGame = ({ user, socket }) => {
       socket.off('player_disconnected', handlePlayerDisconnected);
       socket.off('error', handleSocketError);
     };
-  }, [socket, user, isConnected]);
+  }, [socket, user]);
   
   // Создание комнаты
   const createRoom = () => {
-    if (!socket || !isConnected) {
+    if (!socket || socket.disconnected) {
       setError('Нет подключения к серверу');
       return;
     }
@@ -375,7 +378,7 @@ const FoolGame = ({ user, socket }) => {
       setError('Введите ID комнаты');
       return;
     }
-    if (!socket || !isConnected) {
+    if (!socket || socket.disconnected) {
       setError('Нет подключения к серверу');
       return;
     }
@@ -385,7 +388,7 @@ const FoolGame = ({ user, socket }) => {
 
   // Размещение ставки
   const placeBet = () => {
-    if (!socket || !isConnected) {
+    if (!socket || socket.disconnected) {
       setError('Нет подключения к серверу');
       return;
     }
@@ -398,7 +401,7 @@ const FoolGame = ({ user, socket }) => {
       setError('Выберите карту для атаки');
       return;
     }
-    if (!socket || !isConnected) {
+    if (!socket || socket.disconnected) {
       setError('Нет подключения к серверу');
       return;
     }
@@ -412,7 +415,7 @@ const FoolGame = ({ user, socket }) => {
       setError('Выберите карту для защиты');
       return;
     }
-    if (!socket || !isConnected) {
+    if (!socket || socket.disconnected) {
       setError('Нет подключения к серверу');
       return;
     }
@@ -422,7 +425,7 @@ const FoolGame = ({ user, socket }) => {
 
   // Взять карты
   const takeCards = () => {
-    if (!socket || !isConnected) {
+    if (!socket || socket.disconnected) {
       setError('Нет подключения к серверу');
       return;
     }
@@ -431,7 +434,7 @@ const FoolGame = ({ user, socket }) => {
 
   // Пас
   const pass = () => {
-    if (!socket || !isConnected) {
+    if (!socket || socket.disconnected) {
       setError('Нет подключения к серверу');
       return;
     }
@@ -524,12 +527,13 @@ const FoolGame = ({ user, socket }) => {
         <div style={styles.header}>
           <h1 style={styles.title}>Дурак онлайн</h1>
           <p>Играйте с реальными соперниками</p>
-          {!isConnected && <p style={styles.error}>Подключение к серверу...</p>}
+          {connectionStatus === 'connecting' && <p>Подключение к серверу...</p>}
+          {connectionStatus === 'disconnected' && <p style={styles.error}>Нет подключения к серверу</p>}
           {error && <p style={styles.error}>{error}</p>}
         </div>
         
         <div style={styles.lobby}>
-          <button style={styles.button} onClick={createRoom} disabled={!isConnected}>
+          <button style={styles.button} onClick={createRoom} disabled={connectionStatus !== 'connected'}>
             Создать комнату
           </button>
           
@@ -548,7 +552,7 @@ const FoolGame = ({ user, socket }) => {
                 marginRight: '10px'
               }}
             />
-            <button style={styles.button} onClick={joinRoom} disabled={!isConnected}>
+            <button style={styles.button} onClick={joinRoom} disabled={connectionStatus !== 'connected'}>
               Присоединиться
             </button>
           </div>
@@ -625,7 +629,7 @@ const FoolGame = ({ user, socket }) => {
         <h1 style={styles.title}>Дурак онлайн - Комната: {roomId}</h1>
         <p>{isPlayerTurn ? 'Ваш ход' : 'Ход соперника'}</p>
         {error && <p style={styles.error}>{error}</p>}
-        {!isConnected && <p style={styles.error}>Нет подключения к серверу</p>}
+        {connectionStatus === 'disconnected' && <p style={styles.error}>Нет подключения к серверу</p>}
       </div>
       
       <div style={styles.gameArea}>
@@ -743,7 +747,6 @@ const LoginForm = ({ onLogin }) => {
       return;
     }
     
-    // В реальном приложении здесь будет запрос к API
     onLogin({
       id: Math.random().toString(36).substring(2, 9),
       name: username,
@@ -830,6 +833,7 @@ const LoginForm = ({ onLogin }) => {
 // Главный компонент приложения
 function App() {
   const [user, setUser] = useState(null);
+  const [connectionStatus, setConnectionStatus] = useState('connecting');
   const socketRef = useRef(null);
 
   useEffect(() => {
@@ -839,21 +843,28 @@ function App() {
     
     socketRef.current = io(serverUrl, {
       transports: ['websocket', 'polling'],
-      timeout: 10000
+      timeout: 10000,
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000
     });
     
     // Обработка подключения
     socketRef.current.on('connect', () => {
       console.log('Успешно подключились к серверу');
+      setConnectionStatus('connected');
     });
-    // добавление обработки событий сокета (новое)
-    socketRef.current.on('connected', (data) => {
-      console.error('Подключение к серверу подтверждено:', data);
-
-    });
+    
     // Обработка ошибок подключения
     socketRef.current.on('connect_error', (error) => {
       console.error('Ошибка подключения к серверу:', error);
+      setConnectionStatus('disconnected');
+    });
+    
+    // Обработка отключения
+    socketRef.current.on('disconnect', (reason) => {
+      console.log('Отключились от сервера:', reason);
+      setConnectionStatus('disconnected');
     });
     
     return () => {
