@@ -601,7 +601,7 @@ const FoolGame = ({ user, socket }) => {
                 style={styles.slider}
               />
             </div>
-            <div style={styles.betAmount}>{betAmount} маф</div>
+            <div style={styles.betAmount}>{betAmount} монет</div>
             <button 
               style={styles.button}
               onClick={placeBet}
@@ -639,7 +639,7 @@ const FoolGame = ({ user, socket }) => {
             <div style={styles.playerHeader}>
               <h2 style={styles.playerName}>{gameState.players[opponentIndex].name}</h2>
               <div style={styles.playerStats}>
-                <div style={styles.stat}>Мафы: {gameState.players[opponentIndex].mafs}</div>
+                <div style={styles.stat}>монеты: {gameState.players[opponentIndex].mafs}</div>
                 <div style={styles.stat}>Карты: {gameState.players[opponentIndex].cards.length}</div>
               </div>
             </div>
@@ -653,7 +653,7 @@ const FoolGame = ({ user, socket }) => {
             <div style={styles.playerHeader}>
               <h2 style={styles.playerName}>{gameState.players[playerIndex].name}</h2>
               <div style={styles.playerStats}>
-                <div style={styles.stat}>Мафы: {gameState.players[playerIndex].mafs}</div>
+                <div style={styles.stat}>монеты: {gameState.players[playerIndex].mafs}</div>
                 <div style={styles.stat}>Карты: {gameState.players[playerIndex].cards.length}</div>
               </div>
             </div>
