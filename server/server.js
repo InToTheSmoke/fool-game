@@ -6,29 +6,19 @@ const path = require('path');
 
 const app = express();
 
-// Настройка CORS
-app.use(cors({
-  origin: [
-    "http://localhost:3000",
-    "https://fool-game-client.onrender.com"
-  ],
-  credentials: true
-}));
-
+// Базовые middleware
+app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// Обслуживание статических файлов
-app.use(express.static(path.join(__dirname, '../build')));
+// Обслуживание статических файлов из папки build (если существует)
+app.use(express.static(path.join(__dirname, 'build')));
 
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
-    origin: [
-      "http://localhost:3000",
-      "https://fool-game-client.onrender.com"
-    ],
-    methods: ["GET", "POST"],
-    credentials: true
+    origin: true, // Разрешаем все origins (Render сам позаботится о CORS)
+    methods: ["GET", "POST"]
   }
 });
 
@@ -77,20 +67,15 @@ app.use((req, res, next) => {
   next();
 });
 
-// Обработка корневого пути
-app.get('/', (req, res) => {
+// API маршруты
+app.get('/api', (req, res) => {
   res.json({
     message: 'Сервер игры "Дурак" работает!',
     version: '1.0.0',
-    endpoints: {
-      status: '/api/status',
-      health: '/health'
-    },
     timestamp: new Date().toISOString()
   });
 });
 
-// API для получения статуса сервера
 app.get('/api/status', (req, res) => {
   res.json({
     status: 'Server is running',
@@ -100,8 +85,7 @@ app.get('/api/status', (req, res) => {
   });
 });
 
-// Health check endpoint
-app.get('/health', (req, res) => {
+app.get('/api/health', (req, res) => {
   res.status(200).json({
     status: 'OK',
     timestamp: new Date().toISOString(),
@@ -109,13 +93,9 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Обработка 404 ошибок
-app.use('*', (req, res) => {
-  res.status(404).json({
-    error: 'Not Found',
-    message: 'Запрашиваемый путь не существует',
-    path: req.originalUrl
-  });
+// Обработка всех остальных запросов - возвращаем React приложение
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'build', 'index.html'));
 });
 
 // Обработка подключений WebSocket
@@ -285,6 +265,10 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`=== СЕРВЕР ЗАПУЩЕН НА ПОРТУ ${PORT} ===`);
   console.log(`Время запуска: ${new Date().toISOString()}`);
   console.log(`Режим: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`Доступные API endpoints:`);
+  console.log(`- GET /api - Информация о сервере`);
+  console.log(`- GET /api/status - Статус сервера`);
+  console.log(`- GET /api/health - Health check`);
 });
 
 // Экспорт для тестирования
