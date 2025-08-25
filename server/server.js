@@ -102,15 +102,19 @@ app.get('*', (req, res) => {
 io.on('connection', (socket) => {
   console.log('Пользователь подключился:', socket.id);
   
-  // Отправляем клиенту подтверждение подключения
+  // Немедленно отправляем подтверждение подключения
   socket.emit('connected', { 
     message: 'Подключение к серверу установлено',
-    socketId: socket.id 
+    socketId: socket.id,
+    status: 'connected'
   });
+
+  // Также отправляем стандартное событие connect для совместимости
+  socket.emit('connect');
   
   // Обработка ping-запросов для поддержания активности
   socket.on('ping', (data) => {
-    socket.emit('pong', { timestamp: Date.now() });
+    socket.emit('pong', { timestamp: Date.now(), original: data });
   });
   
   // Обработка входа пользователя
