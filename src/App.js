@@ -695,7 +695,7 @@ function App() {
 
   useEffect(() => {
     // Подключаемся к серверу
-    socketRef.current = io('http://localhost:5000');
+    const socketRef = io(process.env.REACT_APP_SERVER_URL || 'https://fool-game-bte4.onrender.com');
     
     return () => {
       if (socketRef.current) {
