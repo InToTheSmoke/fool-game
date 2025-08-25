@@ -4,11 +4,14 @@ const socketIo = require('socket.io');
 const cors = require('cors');
 
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: ["https://fool-game-bte4.onrender.com/"], 
+  credentials: true}
+  ));
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
-    origin: "*",
+    origin: ["https://fool-game-bte4.onrender.com/"], 
     methods: ["GET", "POST"]
   }
 });
