@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import io from 'socket.io-client';
 import './App.css';
 
-// Стилизация компонентов ьь
+// Стилизация компонентов
 const styles = {
   container: {
     fontFamily: '"Arial", sans-serif',
@@ -198,8 +198,55 @@ const styles = {
     padding: '10px',
     borderRadius: '10px',
     display: 'inline-block'
+  },
+  error: {
+    color: '#ff6b6b',
+    textAlign: 'center',
+    padding: '10px',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    borderRadius: '5px',
+    margin: '10px 0'
   }
 };
+
+// Error Boundary для отлова ошибок
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null, errorInfo: null };
+  }
+  
+  static getDerivedStateFromError(error) {
+    return { hasError: true };
+  }
+  
+  componentDidCatch(error, errorInfo) {
+    this.setState({
+      error: error,
+      errorInfo: errorInfo
+    });
+    console.error('Error caught by boundary:', error, errorInfo);
+  }
+  
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={styles.container}>
+          <div style={styles.error}>
+            <h2>Что-то пошло не так.</h2>
+            <details style={{ whiteSpace: 'pre-wrap', color: '#fff' }}>
+              {this.state.error && this.state.error.toString()}
+              <br />
+              {this.state.errorInfo.componentStack}
+            </details>
+          </div>
+        </div>
+      );
+    }
+    
+    return this.props.children;
+  }
+}
 
 // Компонент карты
 const Card = ({ value, suit, onClick, style = {} }) => {
@@ -239,61 +286,120 @@ const FoolGame = ({ user, socket }) => {
   const [selectedCard, setSelectedCard] = useState(null);
   const [roomId, setRoomId] = useState('');
   const [betAmount, setBetAmount] = useState(100);
-  const [gamePhase, setGamePhase] = useState('lobby'); // lobby, waiting, betting, playing
+  const [gamePhase, setGamePhase] = useState('lobby');
+  const [isConnected, setIsConnected] = useState(false);
+  const [error, setError] = useState('');
 
   // Обработка сообщений от сервера
   useEffect(() => {
-    socket.on('game_update', (state) => {
+    if (!socket) return;
+    
+    console.log('Настройка обработчиков событий сокета');
+    
+    const handleGameUpdate = (state) => {
+      console.log('Получено обновление игры:', state);
       setGameState(state);
       setGamePhase(state.gamePhase);
-    });
+      setError('');
+    };
     
-    socket.on('room_created', (id) => {
+    const handleRoomCreated = (id) => {
+      console.log('Комната создана:', id);
       setRoomId(id);
       setGamePhase('waiting');
-    });
+      setError('');
+    };
     
-    socket.on('player_disconnected', () => {
+    const handlePlayerDisconnected = () => {
+      console.log('Игрок отключился');
       setGamePhase('lobby');
       setGameState(null);
-      alert('Соперник disconnected. Возвращаемся в лобби.');
-    });
-    
-    socket.on('error', (message) => {
-      alert(`Ошибка: ${message}`);
-    });
-    
-    return () => {
-      socket.off('game_update');
-      socket.off('room_created');
-      socket.off('player_disconnected');
-      socket.off('error');
+      setError('Соперник отключился. Возвращаемся в лобби.');
     };
-  }, [socket]);
-
+    
+    const handleSocketError = (message) => {
+      console.error('Ошибка сокета:', message);
+      setError(message);
+    };
+    
+    const handleConnect = () => {
+      console.log('Подключено к серверу');
+      setIsConnected(true);
+      setError('');
+    };
+    
+    const handleDisconnect = () => {
+      console.log('Отключено от сервера');
+      setIsConnected(false);
+      setError('Отключено от сервера. Попытка переподключения...');
+    };
+    
+    // Назначаем обработчики событий
+    socket.on('connect', handleConnect);
+    socket.on('disconnect', handleDisconnect);
+    socket.on('game_update', handleGameUpdate);
+    socket.on('room_created', handleRoomCreated);
+    socket.on('player_disconnected', handlePlayerDisconnected);
+    socket.on('error', handleSocketError);
+    
+    // Отправляем данные пользователя после подключения
+    if (isConnected && user) {
+      console.log('Отправка данных пользователя на сервер');
+      socket.emit('user_login', user);
+    }
+    
+    // Очистка обработчиков при размонтировании
+    return () => {
+      socket.off('connect', handleConnect);
+      socket.off('disconnect', handleDisconnect);
+      socket.off('game_update', handleGameUpdate);
+      socket.off('room_created', handleRoomCreated);
+      socket.off('player_disconnected', handlePlayerDisconnected);
+      socket.off('error', handleSocketError);
+    };
+  }, [socket, user, isConnected]);
+  
   // Создание комнаты
   const createRoom = () => {
+    if (!socket || !isConnected) {
+      setError('Нет подключения к серверу');
+      return;
+    }
+    console.log('Создание комнаты');
     socket.emit('create_room');
   };
 
   // Подключение к комнате
   const joinRoom = () => {
     if (!roomId) {
-      alert('Введите ID комнаты');
+      setError('Введите ID комнаты');
       return;
     }
+    if (!socket || !isConnected) {
+      setError('Нет подключения к серверу');
+      return;
+    }
+    console.log('Присоединение к комнате:', roomId);
     socket.emit('join_room', roomId);
   };
 
   // Размещение ставки
   const placeBet = () => {
+    if (!socket || !isConnected) {
+      setError('Нет подключения к серверу');
+      return;
+    }
     socket.emit('place_bet', { roomId, amount: betAmount });
   };
 
   // Атака
   const attack = () => {
     if (!selectedCard) {
-      alert('Выберите карту для атаки');
+      setError('Выберите карту для атаки');
+      return;
+    }
+    if (!socket || !isConnected) {
+      setError('Нет подключения к серверу');
       return;
     }
     socket.emit('attack', { roomId, card: selectedCard });
@@ -303,7 +409,11 @@ const FoolGame = ({ user, socket }) => {
   // Защита
   const defend = () => {
     if (!selectedCard) {
-      alert('Выберите карту для защиты');
+      setError('Выберите карту для защиты');
+      return;
+    }
+    if (!socket || !isConnected) {
+      setError('Нет подключения к серверу');
       return;
     }
     socket.emit('defend', { roomId, card: selectedCard });
@@ -312,11 +422,19 @@ const FoolGame = ({ user, socket }) => {
 
   // Взять карты
   const takeCards = () => {
+    if (!socket || !isConnected) {
+      setError('Нет подключения к серверу');
+      return;
+    }
     socket.emit('take_cards', roomId);
   };
 
   // Пас
   const pass = () => {
+    if (!socket || !isConnected) {
+      setError('Нет подключения к серверу');
+      return;
+    }
     socket.emit('pass', roomId);
   };
 
@@ -406,10 +524,12 @@ const FoolGame = ({ user, socket }) => {
         <div style={styles.header}>
           <h1 style={styles.title}>Дурак онлайн</h1>
           <p>Играйте с реальными соперниками</p>
+          {!isConnected && <p style={styles.error}>Подключение к серверу...</p>}
+          {error && <p style={styles.error}>{error}</p>}
         </div>
         
         <div style={styles.lobby}>
-          <button style={styles.button} onClick={createRoom}>
+          <button style={styles.button} onClick={createRoom} disabled={!isConnected}>
             Создать комнату
           </button>
           
@@ -428,7 +548,7 @@ const FoolGame = ({ user, socket }) => {
                 marginRight: '10px'
               }}
             />
-            <button style={styles.button} onClick={joinRoom}>
+            <button style={styles.button} onClick={joinRoom} disabled={!isConnected}>
               Присоединиться
             </button>
           </div>
@@ -444,6 +564,7 @@ const FoolGame = ({ user, socket }) => {
         <div style={styles.header}>
           <h1 style={styles.title}>Ожидание соперника</h1>
           <p>Пригласите друга, отправив ему ID комнаты</p>
+          {error && <p style={styles.error}>{error}</p>}
         </div>
         
         <div style={styles.lobby}>
@@ -460,6 +581,7 @@ const FoolGame = ({ user, socket }) => {
       <div style={styles.container}>
         <div style={styles.header}>
           <h1 style={styles.title}>Сделайте ставку</h1>
+          {error && <p style={styles.error}>{error}</p>}
         </div>
         
         <div style={styles.bettingPanel}>
@@ -502,6 +624,8 @@ const FoolGame = ({ user, socket }) => {
       <div style={styles.header}>
         <h1 style={styles.title}>Дурак онлайн - Комната: {roomId}</h1>
         <p>{isPlayerTurn ? 'Ваш ход' : 'Ход соперника'}</p>
+        {error && <p style={styles.error}>{error}</p>}
+        {!isConnected && <p style={styles.error}>Нет подключения к серверу</p>}
       </div>
       
       <div style={styles.gameArea}>
@@ -609,10 +733,19 @@ const FoolGame = ({ user, socket }) => {
 const LoginForm = ({ onLogin }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
   
   const handleSubmit = (e) => {
     e.preventDefault();
+    
+    if (!username.trim()) {
+      setError('Введите имя пользователя');
+      return;
+    }
+    
+    // В реальном приложении здесь будет запрос к API
     onLogin({
+      id: Math.random().toString(36).substring(2, 9),
       name: username,
       mafs: 1500
     });
@@ -635,12 +768,18 @@ const LoginForm = ({ onLogin }) => {
         textAlign: 'center'
       }}>
         <h2 style={{ marginBottom: '20px', color: '#fff' }}>Вход в игру</h2>
+        
+        {error && <div style={styles.error}>{error}</div>}
+        
         <div style={{ marginBottom: '15px' }}>
           <input
             type="text"
             placeholder="Имя пользователя"
             value={username}
-            onChange={(e) => setUsername(e.target.value)}
+            onChange={(e) => {
+              setUsername(e.target.value);
+              setError('');
+            }}
             style={{
               width: '100%',
               padding: '10px',
@@ -695,27 +834,24 @@ function App() {
 
   useEffect(() => {
     // Подключаемся к серверу
-    const socketRef = io(process.env.REACT_APP_SERVER_URL || 'https://fool-game-bte4.onrender.com');
-    useEffect(() => {
-  const serverUrl = process.env.REACT_APP_SERVER_URL || 'https://fool-game-bte4.onrender.com';
-  socketRef.current = io(serverUrl);
-
-  socketRef.current.on('connect', () => {
-    console.log('Connected to server');
-  });
-
-  socketRef.current.on('disconnect', () => {
-    console.log('Disconnected from server');
-  });
-
-  socketRef.current.on('connect_error', (error) => {
-    console.error('Connection error:', error);
-  });
-
-  return () => {
-    socketRef.current.disconnect();
-  };
-}, []);
+    const serverUrl = process.env.REACT_APP_SERVER_URL || 'https://fool-game-bte4.onrender.com';
+    console.log('Подключение к серверу:', serverUrl);
+    
+    socketRef.current = io(serverUrl, {
+      transports: ['websocket', 'polling'],
+      timeout: 10000
+    });
+    
+    // Обработка подключения
+    socketRef.current.on('connect', () => {
+      console.log('Успешно подключились к серверу');
+    });
+    
+    // Обработка ошибок подключения
+    socketRef.current.on('connect_error', (error) => {
+      console.error('Ошибка подключения к серверу:', error);
+    });
+    
     return () => {
       if (socketRef.current) {
         socketRef.current.disconnect();
@@ -724,15 +860,24 @@ function App() {
   }, []);
 
   const handleLogin = (userData) => {
+    console.log('Пользователь вошел:', userData);
     setUser(userData);
-    socketRef.current.emit('user_login', userData);
+    
+    // Отправляем данные пользователя на сервер после подключения
+    if (socketRef.current && socketRef.current.connected) {
+      socketRef.current.emit('user_login', userData);
+    }
   };
 
-  if (!user) {
-    return <LoginForm onLogin={handleLogin} />;
-  }
-
-  return <FoolGame user={user} socket={socketRef.current} />;
+  return (
+    <ErrorBoundary>
+      {user ? (
+        <FoolGame user={user} socket={socketRef.current} />
+      ) : (
+        <LoginForm onLogin={handleLogin} />
+      )}
+    </ErrorBoundary>
+  );
 }
 
 export default App;
