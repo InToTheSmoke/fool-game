@@ -206,6 +206,21 @@ const styles = {
     borderRadius: '5px',
     fontSize: '12px',
     zIndex: 1000
+  },
+  loading: {
+    textAlign: 'center',
+    fontSize: '20px',
+    padding: '20px'
+  },
+  reconnectButton: {
+    padding: '10px 20px',
+    border: 'none',
+    borderRadius: '5px',
+    background: '#ff9900',
+    color: '#000',
+    fontWeight: 'bold',
+    cursor: 'pointer',
+    margin: '10px'
   }
 };
 
@@ -281,53 +296,64 @@ const Card = React.memo(({ value, suit, onClick, style = {} }) => {
 });
 
 // Основной компонент игры
-const FoolGame = ({ user, socket }) => {
+const FoolGame = ({ user, socket, onReconnect }) => {
   const [gameState, setGameState] = useState(null);
   const [selectedCard, setSelectedCard] = useState(null);
   const [roomId, setRoomId] = useState('');
   const [gamePhase, setGamePhase] = useState('lobby');
   const [connectionStatus, setConnectionStatus] = useState('connecting');
   const [error, setError] = useState('');
+  const [isPlacingBet, setIsPlacingBet] = useState(false);
   const wakeUpIntervalRef = useRef(null);
+  const reconnectTimeoutRef = useRef(null);
 
   // Функция для "пробуждения" сервера
   const wakeUpServer = useCallback(() => {
     if (socket && socket.connected) {
-      // Отправляем легкий запрос для поддержания активности
       socket.emit('ping', { timestamp: Date.now() });
-      console.log('Отправлен ping серверу');
-    } else {
-      console.log('Сервер не подключен');
     }
   }, [socket]);
 
   // Настройка интервала для "пробуждения" сервера
   useEffect(() => {
-    // Запускаем интервал каждые 10 секунд
-    wakeUpIntervalRef.current = setInterval(wakeUpServer, 10000);
+    wakeUpIntervalRef.current = setInterval(wakeUpServer, 8000);
     
-    // Очистка интервала при размонтировании
     return () => {
       if (wakeUpIntervalRef.current) {
         clearInterval(wakeUpIntervalRef.current);
       }
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
     };
   }, [wakeUpServer]);
+
+  // Функция переподключения
+  const attemptReconnect = useCallback(() => {
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+    }
+    
+    reconnectTimeoutRef.current = setTimeout(() => {
+      console.log('Попытка переподключения...');
+      onReconnect();
+    }, 3000);
+  }, [onReconnect]);
 
   // Обработка сообщений от сервера
   useEffect(() => {
     if (!socket) {
       setError('Нет подключения к серверу');
+      attemptReconnect();
       return;
     }
-    
-    console.log('Настройка обработчиков событий сокета');
     
     const handleGameUpdate = (state) => {
       console.log('Получено обновление игры:', state);
       setGameState(state);
       setGamePhase(state.gamePhase);
       setError('');
+      setIsPlacingBet(false);
     };
     
     const handleRoomCreated = (id) => {
@@ -347,6 +373,7 @@ const FoolGame = ({ user, socket }) => {
     const handleSocketError = (message) => {
       console.error('Ошибка сокета:', message);
       setError(message);
+      attemptReconnect();
     };
     
     const handleConnect = () => {
@@ -354,10 +381,15 @@ const FoolGame = ({ user, socket }) => {
       setConnectionStatus('connected');
       setError('');
       
-      // Отправляем данные пользователя после подключения
       if (user) {
         console.log('Отправка данных пользователя на сервер');
         socket.emit('user_login', user);
+        
+        // Если была комната, пытаемся переподключиться к ней
+        if (roomId) {
+          console.log('Переподключение к комнате:', roomId);
+          socket.emit('join_room', roomId);
+        }
       }
     };
     
@@ -365,10 +397,16 @@ const FoolGame = ({ user, socket }) => {
       console.log('Отключено от сервера');
       setConnectionStatus('disconnected');
       setError('Отключено от сервера. Попытка переподключения...');
+      attemptReconnect();
     };
 
     const handlePong = () => {
-      console.log('Сервер активен, получен pong');
+      console.log('Сервер активен');
+    };
+    
+    const handleBetPlaced = () => {
+      console.log('Ставка размещена успешно');
+      setIsPlacingBet(false);
     };
     
     // Назначаем обработчики событий
@@ -379,6 +417,12 @@ const FoolGame = ({ user, socket }) => {
     socket.on('player_disconnected', handlePlayerDisconnected);
     socket.on('error', handleSocketError);
     socket.on('pong', handlePong);
+    socket.on('bet_placed', handleBetPlaced);
+    
+    // Инициализируем подключение
+    if (socket.disconnected) {
+      socket.connect();
+    }
     
     // Очистка обработчиков при размонтировании
     return () => {
@@ -389,13 +433,45 @@ const FoolGame = ({ user, socket }) => {
       socket.off('player_disconnected', handlePlayerDisconnected);
       socket.off('error', handleSocketError);
       socket.off('pong', handlePong);
+      socket.off('bet_placed', handleBetPlaced);
     };
-  }, [socket, user]);
+  }, [socket, user, roomId, attemptReconnect]);
   
+  // Размещение ставки (фиксированная ставка 10 монет)
+  useEffect(() => {
+    if (gamePhase === 'betting' && socket && socket.connected && !isPlacingBet) {
+      setIsPlacingBet(true);
+      const fixedBetAmount = 10;
+      console.log('Автоматическое размещение ставки:', fixedBetAmount, 'монет');
+      
+      // Отправляем ставку с повторными попытками
+      const placeBetWithRetry = (attempt = 0) => {
+        if (attempt >= 3) {
+          setError('Не удалось разместить ставку. Попробуйте переподключиться.');
+          setIsPlacingBet(false);
+          return;
+        }
+        
+        socket.emit('place_bet', { roomId, amount: fixedBetAmount });
+        
+        // Проверяем через 2 секунды, прошла ли ставка
+        setTimeout(() => {
+          if (isPlacingBet) {
+            console.log('Повторная попытка размещения ставки:', attempt + 1);
+            placeBetWithRetry(attempt + 1);
+          }
+        }, 2000);
+      };
+      
+      placeBetWithRetry();
+    }
+  }, [gamePhase, roomId, socket, isPlacingBet]);
+
   // Создание комнаты
   const createRoom = () => {
     if (!socket || socket.disconnected) {
       setError('Нет подключения к серверу');
+      attemptReconnect();
       return;
     }
     console.log('Создание комнаты');
@@ -410,20 +486,12 @@ const FoolGame = ({ user, socket }) => {
     }
     if (!socket || socket.disconnected) {
       setError('Нет подключения к серверу');
+      attemptReconnect();
       return;
     }
     console.log('Присоединение к комнате:', roomId);
     socket.emit('join_room', roomId);
   };
-
-  // Размещение ставки (фиксированная ставка 10 монет) - автоматически при переходе в фазу ставок
-  useEffect(() => {
-    if (gamePhase === 'betting' && socket && socket.connected) {
-      const fixedBetAmount = 10; // Фиксированная ставка
-      console.log('Автоматическое размещение ставки:', fixedBetAmount, 'монет');
-      socket.emit('place_bet', { roomId, amount: fixedBetAmount });
-    }
-  }, [gamePhase, roomId, socket]);
 
   // Атака
   const attack = () => {
@@ -433,6 +501,7 @@ const FoolGame = ({ user, socket }) => {
     }
     if (!socket || socket.disconnected) {
       setError('Нет подключения к серверу');
+      attemptReconnect();
       return;
     }
     socket.emit('attack', { roomId, card: selectedCard });
@@ -447,6 +516,7 @@ const FoolGame = ({ user, socket }) => {
     }
     if (!socket || socket.disconnected) {
       setError('Нет подключения к серверу');
+      attemptReconnect();
       return;
     }
     socket.emit('defend', { roomId, card: selectedCard });
@@ -457,6 +527,7 @@ const FoolGame = ({ user, socket }) => {
   const takeCards = () => {
     if (!socket || socket.disconnected) {
       setError('Нет подключения к серверу');
+      attemptReconnect();
       return;
     }
     socket.emit('take_cards', roomId);
@@ -466,6 +537,7 @@ const FoolGame = ({ user, socket }) => {
   const pass = () => {
     if (!socket || socket.disconnected) {
       setError('Нет подключения к серверу');
+      attemptReconnect();
       return;
     }
     socket.emit('pass', roomId);
@@ -496,7 +568,7 @@ const FoolGame = ({ user, socket }) => {
         }}
       />
     ));
-  }, [gameState, selectedCard, socket.id]);
+  }, [gameState, selectedCard, socket?.id]);
 
   // Рендер карт оппонента
   const renderOpponentCards = useCallback(() => {
@@ -523,7 +595,7 @@ const FoolGame = ({ user, socket }) => {
         ♠
       </div>
     ));
-  }, [gameState, socket.id]);
+  }, [gameState, socket?.id]);
 
   // Рендер карт на столе
   const renderTableCards = useCallback(() => {
@@ -550,6 +622,29 @@ const FoolGame = ({ user, socket }) => {
     );
   }, [gameState]);
 
+  // Если нет подключения
+  if (!socket || connectionStatus === 'disconnected') {
+    return (
+      <div style={styles.container}>
+        <div style={styles.header}>
+          <h1 style={styles.title}>Дурак онлайн</h1>
+          <p>Нет подключения к серверу</p>
+        </div>
+        <div style={styles.lobby}>
+          <div style={styles.error}>
+            {error || 'Сервер недоступен. Попытка переподключения...'}
+          </div>
+          <button 
+            style={styles.reconnectButton}
+            onClick={onReconnect}
+          >
+            Переподключиться
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // Лобби игры
   if (gamePhase === 'lobby') {
     return (
@@ -558,7 +653,6 @@ const FoolGame = ({ user, socket }) => {
           <h1 style={styles.title}>Дурак онлайн</h1>
           <p>Играйте с реальными соперниками</p>
           {connectionStatus === 'connecting' && <p>Подключение к серверу...</p>}
-          {connectionStatus === 'disconnected' && <p style={styles.error}>Нет подключения к серверу</p>}
           {error && <p style={styles.error}>{error}</p>}
         </div>
         
@@ -570,16 +664,6 @@ const FoolGame = ({ user, socket }) => {
             }}
             onClick={createRoom} 
             disabled={connectionStatus !== 'connected'}
-            onMouseOver={(e) => {
-              if (connectionStatus === 'connected') {
-                e.target.style.transform = 'translateY(-3px)';
-                e.target.style.boxShadow = '0 8px 20px rgba(0, 0, 0, 0.3)';
-              }
-            }}
-            onMouseOut={(e) => {
-              e.target.style.transform = 'translateY(0px)';
-              e.target.style.boxShadow = '0 5px 15px rgba(0, 0, 0, 0.2)';
-            }}
           >
             Создать комнату
           </button>
@@ -606,16 +690,6 @@ const FoolGame = ({ user, socket }) => {
               }}
               onClick={joinRoom} 
               disabled={connectionStatus !== 'connected'}
-              onMouseOver={(e) => {
-                if (connectionStatus === 'connected') {
-                  e.target.style.transform = 'translateY(-3px)';
-                  e.target.style.boxShadow = '0 8px 20px rgba(0, 0, 0, 0.3)';
-                }
-              }}
-              onMouseOut={(e) => {
-                e.target.style.transform = 'translateY(0px)';
-                e.target.style.boxShadow = '0 5px 15px rgba(0, 0, 0, 0.2)';
-              }}
             >
               Присоединиться
             </button>
@@ -653,12 +727,14 @@ const FoolGame = ({ user, socket }) => {
         </div>
         
         <div style={styles.bettingPanel}>
-          <h3 style={styles.bettingTitle}>Размещаем ставку...</h3>
+          <h3 style={styles.bettingTitle}>
+            {isPlacingBet ? 'Размещаем ставку...' : 'Ставка размещена!'}
+          </h3>
           <div style={styles.betControls}>
             <div style={styles.betAmount}>10 монет</div>
-            <div style={{ fontSize: '16px', marginTop: '10px' }}>
-              Ставка размещается автоматически
-            </div>
+            {isPlacingBet && (
+              <div style={styles.loading}>Пожалуйста, подождите...</div>
+            )}
           </div>
         </div>
       </div>
@@ -666,7 +742,7 @@ const FoolGame = ({ user, socket }) => {
   }
 
   // Основной игровой интерфейс
-  if (!gameState) return <div>Загрузка...</div>;
+  if (!gameState) return <div style={styles.loading}>Загрузка игры...</div>;
 
   const playerIndex = gameState.players.findIndex(p => p.id === socket.id);
   if (playerIndex === -1) return <div>Ошибка: игрок не найден</div>;
@@ -680,7 +756,6 @@ const FoolGame = ({ user, socket }) => {
         <h1 style={styles.title}>Дурак онлайн - Комната: {roomId}</h1>
         <p>{isPlayerTurn ? 'Ваш ход' : 'Ход соперника'}</p>
         {error && <p style={styles.error}>{error}</p>}
-        {connectionStatus === 'disconnected' && <p style={styles.error}>Нет подключения к серверу</p>}
       </div>
       
       <div style={styles.gameArea}>
@@ -733,16 +808,6 @@ const FoolGame = ({ user, socket }) => {
             }}
             onClick={attack}
             disabled={!(gameState.gamePhase === 'attacking' && isPlayerTurn)}
-            onMouseOver={(e) => {
-              if (gameState.gamePhase === 'attacking' && isPlayerTurn) {
-                e.target.style.transform = 'translateY(-3px)';
-                e.target.style.boxShadow = '0 8px 20px rgba(0, 0, 0, 0.3)';
-              }
-            }}
-            onMouseOut={(e) => {
-              e.target.style.transform = 'translateY(0px)';
-              e.target.style.boxShadow = '0 5px 15px rgba(0, 0, 0, 0.2)';
-            }}
           >
             Атаковать
           </button>
@@ -753,16 +818,6 @@ const FoolGame = ({ user, socket }) => {
             }}
             onClick={defend}
             disabled={!(gameState.gamePhase === 'defending' && isPlayerTurn)}
-            onMouseOver={(e) => {
-              if (gameState.gamePhase === 'defending' && isPlayerTurn) {
-                e.target.style.transform = 'translateY(-3px)';
-                e.target.style.boxShadow = '0 8px 20px rgba(0, 0, 0, 0.3)';
-              }
-            }}
-            onMouseOut={(e) => {
-              e.target.style.transform = 'translateY(0px)';
-              e.target.style.boxShadow = '0 5px 15px rgba(0, 0, 0, 0.2)';
-            }}
           >
             Защищаться
           </button>
@@ -773,16 +828,6 @@ const FoolGame = ({ user, socket }) => {
             }}
             onClick={takeCards}
             disabled={!(gameState.gamePhase === 'defending' && isPlayerTurn)}
-            onMouseOver={(e) => {
-              if (gameState.gamePhase === 'defending' && isPlayerTurn) {
-                e.target.style.transform = 'translateY(-3px)';
-                e.target.style.boxShadow = '0 8px 20px rgba(0, 0, 0, 0.3)';
-              }
-            }}
-            onMouseOut={(e) => {
-              e.target.style.transform = 'translateY(0px)';
-              e.target.style.boxShadow = '0 5px 15px rgba(0, 0, 0, 0.2)';
-            }}
           >
             Взять
           </button>
@@ -793,16 +838,6 @@ const FoolGame = ({ user, socket }) => {
             }}
             onClick={pass}
             disabled={!(gameState.gamePhase === 'attacking' && isPlayerTurn)}
-            onMouseOver={(e) => {
-              if (gameState.gamePhase === 'attacking' && isPlayerTurn) {
-                e.target.style.transform = 'translateY(-3px)';
-                e.target.style.boxShadow = '0 8px 20px rgba(0, 0, 0, 0.3)';
-              }
-            }}
-            onMouseOut={(e) => {
-              e.target.style.transform = 'translateY(0px)';
-              e.target.style.boxShadow = '0 5px 15px rgba(0, 0, 0, 0.2)';
-            }}
           >
             Пас
           </button>
@@ -920,43 +955,53 @@ const LoginForm = ({ onLogin }) => {
 // Главный компонент приложения
 function App() {
   const [user, setUser] = useState(null);
+  const [socket, setSocket] = useState(null);
   const [connectionStatus, setConnectionStatus] = useState('connecting');
-  const socketRef = useRef(null);
+  const [key, setKey] = useState(0); // Для принудительного пересоздания компонента
 
-  useEffect(() => {
-    // Подключаемся к серверу
+  const createSocketConnection = useCallback(() => {
+    // Закрываем предыдущее соединение
+    if (socket) {
+      socket.disconnect();
+    }
+
     const serverUrl = process.env.REACT_APP_SERVER_URL || 'https://fool-game-bte4.onrender.com';
-    console.log('Подключение к серверу:', serverUrl);
+    console.log('Создание нового подключения к серверу:', serverUrl);
     
-    socketRef.current = io(serverUrl, {
+    const newSocket = io(serverUrl, {
       transports: ['websocket', 'polling'],
       timeout: 10000,
       reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000
     });
     
-    // Обработка подключения
-    socketRef.current.on('connect', () => {
+    newSocket.on('connect', () => {
       console.log('Успешно подключились к серверу');
       setConnectionStatus('connected');
     });
     
-    // Обработка ошибок подключения
-    socketRef.current.on('connect_error', (error) => {
+    newSocket.on('connect_error', (error) => {
       console.error('Ошибка подключения к серверу:', error);
       setConnectionStatus('disconnected');
     });
     
-    // Обработка отключения
-    socketRef.current.on('disconnect', (reason) => {
+    newSocket.on('disconnect', (reason) => {
       console.log('Отключились от сервера:', reason);
       setConnectionStatus('disconnected');
     });
     
+    setSocket(newSocket);
+    setKey(prev => prev + 1); // Принудительно пересоздаем компонент
+  }, [socket]);
+
+  useEffect(() => {
+    createSocketConnection();
+    
     return () => {
-      if (socketRef.current) {
-        socketRef.current.disconnect();
+      if (socket) {
+        socket.disconnect();
       }
     };
   }, []);
@@ -965,23 +1010,35 @@ function App() {
     console.log('Пользователь вошел:', userData);
     setUser(userData);
     
-    // Отправляем данные пользователя на сервер после подключения
-    if (socketRef.current && socketRef.current.connected) {
-      socketRef.current.emit('user_login', userData);
+    if (socket && socket.connected) {
+      socket.emit('user_login', userData);
     }
+  };
+
+  const handleReconnect = () => {
+    console.log('Принудительное переподключение');
+    setConnectionStatus('connecting');
+    createSocketConnection();
   };
 
   return (
     <ErrorBoundary>
       <div style={{
         ...styles.connectionStatus,
-        backgroundColor: connectionStatus === 'connected' ? '#4caf50' : '#f44336'
+        backgroundColor: connectionStatus === 'connected' ? '#4caf50' : 
+                        connectionStatus === 'connecting' ? '#ff9800' : '#f44336'
       }}>
-        {connectionStatus === 'connected' ? 'Подключено' : 'Отключено'}
+        {connectionStatus === 'connected' ? 'Подключено' : 
+         connectionStatus === 'connecting' ? 'Подключение...' : 'Отключено'}
       </div>
       
       {user ? (
-        <FoolGame user={user} socket={socketRef.current} />
+        <FoolGame 
+          key={key}
+          user={user} 
+          socket={socket} 
+          onReconnect={handleReconnect}
+        />
       ) : (
         <LoginForm onLogin={handleLogin} />
       )}
