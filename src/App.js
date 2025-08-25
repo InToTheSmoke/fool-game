@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import io from 'socket.io-client';
 import './App.css';
 
-// Стилизация компонентов
+// Стилизация компонентов ьь
 const styles = {
   container: {
     fontFamily: '"Arial", sans-serif',
