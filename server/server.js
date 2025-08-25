@@ -143,51 +143,53 @@ io.on('connection', (socket) => {
     }
   });
   
-  // Создание новой комната
-  socket.on('create_room', () => {
-    try {
-      const user = users.get(socket.id);
-      
-      if (!user) {
-        socket.emit('error', 'Сначала войдите в систему');
-        return;
-      }
-      
-      const roomId = Math.random().toString(36).substring(2, 8);
-      const deck = shuffleDeck(generateDeck());
-      const trumpCard = deck[0];
-      
-      const room = {
-        id: roomId,
-        players: [{
-          id: socket.id,
-          name: user.name,
-          mafs: user.mafs,
-          cards: deck.slice(1, 7),
-          isActive: true
-        }],
-        deck: deck.slice(13),
-        trumpCard,
-        table: [],
-        currentPlayer: 0,
-        betAmount: 100,
-        gameStarted: false,
-        gamePhase: 'waiting'
-      };
-      
-      rooms.set(roomId, room);
-      socket.join(roomId);
-      
-      // Отправляем обновление всем клиентам в комнате
-      io.to(roomId).emit('room_created', roomId);
-      io.to(roomId).emit('game_update', room);
-      
-      console.log('Комната создана:', roomId);
-    } catch (error) {
-      console.error('Ошибка при создании комнаты:', error);
-      socket.emit('error', 'Ошибка при создании комнаты');
+  // Создание новой комнаты
+socket.on('create_room', () => {
+  try {
+    const user = users.get(socket.id);
+    
+    if (!user) {
+      socket.emit('error', 'Сначала войдите в систему');
+      return;
     }
-  });
+    
+    const roomId = Math.random().toString(36).substring(2, 8);
+    const deck = shuffleDeck(generateDeck());
+    const trumpCard = deck[0];
+    
+    const room = {
+      id: roomId,
+      players: [{
+        id: socket.id,
+        name: user.name,
+        mafs: user.mafs,
+        cards: deck.slice(1, 7),
+        isActive: true
+      }],
+      deck: deck.slice(13),
+      trumpCard,
+      table: [],
+      currentPlayer: 0,
+      betAmount: 100,
+      gameStarted: false,
+      gamePhase: 'waiting'
+    };
+    
+    rooms.set(roomId, room);
+    socket.join(roomId);
+    
+    // ОТПРАВЛЯЕМ ТОЛЬКО СОЗДАТЕЛЮ КОМНАТЫ
+    socket.emit('room_created', roomId);
+    
+    // Отправляем обновление состояния комнаты
+    socket.emit('game_update', room);
+    
+    console.log('Комната создана:', roomId, 'Пользователь:', user.name);
+  } catch (error) {
+    console.error('Ошибка при создании комнаты:', error);
+    socket.emit('error', 'Ошибка при создании комнаты');
+  }
+});
   
   // Подключение к комнате
   socket.on('join_room', (roomId) => {
