@@ -846,7 +846,11 @@ function App() {
     socketRef.current.on('connect', () => {
       console.log('Успешно подключились к серверу');
     });
-    
+    // добавление обработки событий сокета (новое)
+    socketRef.current.on('connected', (data) => {
+      console.error('Подключение к серверу подтверждено:', data);
+      setIsConnected(true);
+    });
     // Обработка ошибок подключения
     socketRef.current.on('connect_error', (error) => {
       console.error('Ошибка подключения к серверу:', error);
