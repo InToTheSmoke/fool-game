@@ -118,6 +118,10 @@ app.get('/api/status', (req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
+
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`Сервер запущен на порту ${PORT}`);
+  console.log(`API доступно по: http://localhost:${PORT}`);
+  console.log(`Статус сервера: http://localhost:${PORT}/api/status`);
+  console.log(`Health check: http://localhost:${PORT}/health`);
 });
