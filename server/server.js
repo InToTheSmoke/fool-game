@@ -12,7 +12,8 @@ const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
     origin: ["https://fool-game-bte4.onrender.com/"], 
-    methods: ["GET", "POST"]
+    methods: ["GET", "POST"],
+    credentials: true
   }
 });
 
