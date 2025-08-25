@@ -12,12 +12,12 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Обслуживание статических файлов из папки build (если существует)
-app.use(express.static(path.join(__dirname, 'build')));
+app.use(express.static(path.join(__dirname, '../build')));
 
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
-    origin: true, // Разрешаем все origins (Render сам позаботится о CORS)
+    origin: "*", // Разрешаем все origins
     methods: ["GET", "POST"]
   }
 });
@@ -95,12 +95,18 @@ app.get('/api/health', (req, res) => {
 
 // Обработка всех остальных запросов - возвращаем React приложение
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'build', 'index.html'));
+  res.sendFile(path.join(__dirname, '../build', 'index.html'));
 });
 
 // Обработка подключений WebSocket
 io.on('connection', (socket) => {
   console.log('Пользователь подключился:', socket.id);
+  
+  // Отправляем клиенту подтверждение подключения
+  socket.emit('connected', { 
+    message: 'Подключение к серверу установлено',
+    socketId: socket.id 
+  });
   
   // Обработка входа пользователя
   socket.on('user_login', (userData) => {
@@ -142,7 +148,7 @@ io.on('connection', (socket) => {
       const deck = shuffleDeck(generateDeck());
       const trumpCard = deck[0];
       
-      rooms.set(roomId, {
+      const room = {
         id: roomId,
         players: [{
           id: socket.id,
@@ -158,10 +164,15 @@ io.on('connection', (socket) => {
         betAmount: 100,
         gameStarted: false,
         gamePhase: 'waiting'
-      });
+      };
       
+      rooms.set(roomId, room);
       socket.join(roomId);
-      socket.emit('room_created', roomId);
+      
+      // Отправляем обновление всем клиентам в комнате
+      io.to(roomId).emit('room_created', roomId);
+      io.to(roomId).emit('game_update', room);
+      
       console.log('Комната создана:', roomId);
     } catch (error) {
       console.error('Ошибка при создании комнаты:', error);
@@ -205,7 +216,10 @@ io.on('connection', (socket) => {
       room.gamePhase = 'betting';
       
       socket.join(roomId);
+      
+      // Отправляем обновление всем клиентам в комнате
       io.to(roomId).emit('game_update', room);
+      
       console.log('Пользователь присоединился к комнате:', roomId);
     } catch (error) {
       console.error('Ошибка при присоединении к комнате:', error);
@@ -214,8 +228,8 @@ io.on('connection', (socket) => {
   });
   
   // Обработка отключения
-  socket.on('disconnect', () => {
-    console.log('Пользователь отключился:', socket.id);
+  socket.on('disconnect', (reason) => {
+    console.log('Пользователь отключился:', socket.id, 'Причина:', reason);
     
     try {
       // Удаляем пользователя из всех комнат
@@ -230,6 +244,9 @@ io.on('connection', (socket) => {
           if (room.players.length === 0) {
             rooms.delete(roomId);
             console.log('Комната удалена:', roomId);
+          } else {
+            // Отправляем обновление состояния игры
+            io.to(roomId).emit('game_update', room);
           }
           
           break;
