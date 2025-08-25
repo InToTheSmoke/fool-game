@@ -117,31 +117,32 @@ io.on('connection', (socket) => {
     socket.emit('pong', { timestamp: Date.now(), original: data });
   });
   
-  // Обработка входа пользователя
-  socket.on('user_login', (userData) => {
-    try {
-      console.log('Получены данные пользователя:', userData);
-      
-      if (!userData || !userData.name) {
-        socket.emit('login_error', 'Имя пользователя обязательно');
-        return;
-      }
-      
-      const user = {
-        id: socket.id,
-        name: userData.name,
-        mafs: userData.mafs || 1000
-      };
-      
-      users.set(socket.id, user);
-      console.log('Пользователь сохранен:', user);
-      
-      socket.emit('login_success', user);
-    } catch (error) {
-      console.error('Ошибка при входе пользователя:', error);
-      socket.emit('login_error', 'Внутренняя ошибка сервера');
+ // Обработка входа пользователя
+socket.on('user_login', (userData) => {
+  try {
+    console.log('Получены данные пользователя:', userData);
+    
+    if (!userData || !userData.name) {
+      socket.emit('login_error', 'Имя пользователя обязательно');
+      return;
     }
-  });
+    
+    const user = {
+      id: socket.id,
+      name: userData.name,
+      mafs: userData.mafs || 1000
+    };
+    
+    users.set(socket.id, user);
+    console.log('Пользователь сохранен:', user);
+    
+    socket.emit('login_success', user);
+    console.log('Отправлено подтверждение входа пользователю:', socket.id);
+  } catch (error) {
+    console.error('Ошибка при входе пользователя:', error);
+    socket.emit('login_error', 'Внутренняя ошибка сервера');
+  }
+});
   
   // Создание новой комнаты
 socket.on('create_room', () => {
