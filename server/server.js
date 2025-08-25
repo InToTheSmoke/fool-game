@@ -121,7 +121,7 @@ app.get('/api/status', (req, res) => {
   res.json({ status: 'Server is running', rooms: rooms.size, users: users.size });
 });
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 10000;
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Сервер запущен на порту ${PORT}`);
