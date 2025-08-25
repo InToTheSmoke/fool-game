@@ -696,7 +696,26 @@ function App() {
   useEffect(() => {
     // Подключаемся к серверу
     const socketRef = io(process.env.REACT_APP_SERVER_URL || 'https://fool-game-bte4.onrender.com');
-    
+    useEffect(() => {
+  const serverUrl = process.env.REACT_APP_SERVER_URL || 'https://fool-game-bte4.onrender.com';
+  socketRef.current = io(serverUrl);
+
+  socketRef.current.on('connect', () => {
+    console.log('Connected to server');
+  });
+
+  socketRef.current.on('disconnect', () => {
+    console.log('Disconnected from server');
+  });
+
+  socketRef.current.on('connect_error', (error) => {
+    console.error('Connection error:', error);
+  });
+
+  return () => {
+    socketRef.current.disconnect();
+  };
+}, []);
     return () => {
       if (socketRef.current) {
         socketRef.current.disconnect();
