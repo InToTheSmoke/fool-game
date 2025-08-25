@@ -416,16 +416,14 @@ const FoolGame = ({ user, socket }) => {
     socket.emit('join_room', roomId);
   };
 
-  // Размещение ставки (фиксированная ставка 10 монет)
-  const placeBet = () => {
-    if (!socket || socket.disconnected) {
-      setError('Нет подключения к серверу');
-      return;
+  // Размещение ставки (фиксированная ставка 10 монет) - автоматически при переходе в фазу ставок
+  useEffect(() => {
+    if (gamePhase === 'betting' && socket && socket.connected) {
+      const fixedBetAmount = 10; // Фиксированная ставка
+      console.log('Автоматическое размещение ставки:', fixedBetAmount, 'монет');
+      socket.emit('place_bet', { roomId, amount: fixedBetAmount });
     }
-    const fixedBetAmount = 10; // Фиксированная ставка
-    console.log('Размещение ставки:', fixedBetAmount, 'монет');
-    socket.emit('place_bet', { roomId, amount: fixedBetAmount });
-  };
+  }, [gamePhase, roomId, socket]);
 
   // Атака
   const attack = () => {
@@ -645,33 +643,22 @@ const FoolGame = ({ user, socket }) => {
     );
   }
 
-  // Фаза ставок
+  // Фаза ставок - автоматическая ставка
   if (gamePhase === 'betting') {
     return (
       <div style={styles.container}>
         <div style={styles.header}>
-          <h1 style={styles.title}>Сделайте ставку</h1>
+          <h1 style={styles.title}>Размещение ставки</h1>
           {error && <p style={styles.error}>{error}</p>}
         </div>
         
         <div style={styles.bettingPanel}>
-          <h3 style={styles.bettingTitle}>Ставка: 10 монет</h3>
+          <h3 style={styles.bettingTitle}>Размещаем ставку...</h3>
           <div style={styles.betControls}>
             <div style={styles.betAmount}>10 монет</div>
-            <button 
-              style={styles.button}
-              onClick={placeBet}
-              onMouseOver={(e) => {
-                e.target.style.transform = 'translateY(-3px)';
-                e.target.style.boxShadow = '0 8px 20px rgba(0, 0, 0, 0.3)';
-              }}
-              onMouseOut={(e) => {
-                e.target.style.transform = 'translateY(0px)';
-                e.target.style.boxShadow = '0 5px 15px rgba(0, 0, 0, 0.2)';
-              }}
-            >
-              Подтвердить ставку
-            </button>
+            <div style={{ fontSize: '16px', marginTop: '10px' }}>
+              Ставка размещается автоматически
+            </div>
           </div>
         </div>
       </div>
