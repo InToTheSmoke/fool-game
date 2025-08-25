@@ -296,7 +296,7 @@ const Card = React.memo(({ value, suit, onClick, style = {} }) => {
 });
 
 // Основной компонент игры
-const FoolGame = ({ user, socket, onReconnect }) => {
+const FoolGame = ({ user, socket, onReconnect, connectionStatus }) => {
   const [gameState, setGameState] = useState(null);
   const [selectedCard, setSelectedCard] = useState(null);
   const [roomId, setRoomId] = useState('');
@@ -826,7 +826,7 @@ const FoolGame = ({ user, socket, onReconnect }) => {
 };
 
 // Компонент аутентификации
-const LoginForm = ({ onLogin }) => {
+const LoginForm = ({ onLogin, connectionStatus }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -836,6 +836,11 @@ const LoginForm = ({ onLogin }) => {
     
     if (!username.trim()) {
       setError('Введите имя пользователя');
+      return;
+    }
+    
+    if (connectionStatus !== 'connected') {
+      setError('Нет подключения к серверу');
       return;
     }
     
@@ -866,6 +871,19 @@ const LoginForm = ({ onLogin }) => {
         
         {error && <div style={styles.error}>{error}</div>}
         
+        <div style={{ 
+          marginBottom: '15px',
+          padding: '10px',
+          backgroundColor: connectionStatus === 'connected' ? '#4caf50' : 
+                         connectionStatus === 'connecting' ? '#ff9800' : '#f44336',
+          borderRadius: '5px',
+          color: 'white',
+          fontSize: '14px'
+        }}>
+          Статус: {connectionStatus === 'connected' ? 'Подключено' : 
+                  connectionStatus === 'connecting' ? 'Подключение...' : 'Отключено'}
+        </div>
+        
         <div style={{ marginBottom: '15px' }}>
           <input
             type="text"
@@ -883,6 +901,7 @@ const LoginForm = ({ onLogin }) => {
               fontSize: '16px'
             }}
             required
+            disabled={connectionStatus !== 'connected'}
           />
         </div>
         <div style={{ marginBottom: '20px' }}>
@@ -899,6 +918,7 @@ const LoginForm = ({ onLogin }) => {
               fontSize: '16px'
             }}
             required
+            disabled={connectionStatus !== 'connected'}
           />
         </div>
         <button
@@ -908,14 +928,16 @@ const LoginForm = ({ onLogin }) => {
             padding: '12px',
             border: 'none',
             borderRadius: '5px',
-            background: 'linear-gradient(to right, #ffcc00, #ff9900)',
+            background: connectionStatus === 'connected' ? 
+                       'linear-gradient(to right, #ffcc00, #ff9900)' : '#666',
             color: '#000',
             fontWeight: 'bold',
             fontSize: '16px',
-            cursor: 'pointer'
+            cursor: connectionStatus === 'connected' ? 'pointer' : 'not-allowed'
           }}
+          disabled={connectionStatus !== 'connected'}
         >
-          Войти
+          {connectionStatus === 'connected' ? 'Войти' : 'Ожидание подключения...'}
         </button>
       </form>
     </div>
