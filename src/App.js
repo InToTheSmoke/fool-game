@@ -927,12 +927,13 @@ function App() {
   const [user, setUser] = useState(null);
   const [socket, setSocket] = useState(null);
   const [connectionStatus, setConnectionStatus] = useState('connecting');
-  const [key, setKey] = useState(0); // Для принудительного пересоздания компонента
+  const [key, setKey] = useState(0);
 
   const createSocketConnection = useCallback(() => {
     // Закрываем предыдущее соединение
     if (socket) {
       socket.disconnect();
+      console.log('Закрыто предыдущее соединение');
     }
 
     const serverUrl = process.env.REACT_APP_SERVER_URL || 'https://fool-game-bte4.onrender.com';
@@ -940,30 +941,46 @@ function App() {
     
     const newSocket = io(serverUrl, {
       transports: ['websocket', 'polling'],
-      timeout: 10000,
+      timeout: 15000,
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000
+      reconnectionDelayMax: 5000,
+      forceNew: true // Важно: создаем новое соединение
     });
     
+    // Обработка успешного подключения
     newSocket.on('connect', () => {
-      console.log('Успешно подключились к серверу');
+      console.log('Сокет подключен к серверу');
       setConnectionStatus('connected');
     });
     
+    // Обработка собственного события connected
+    newSocket.on('connected', (data) => {
+      console.log('Получено подтверждение от сервера:', data);
+      setConnectionStatus('connected');
+    });
+    
+    // Обработка ошибок подключения
     newSocket.on('connect_error', (error) => {
       console.error('Ошибка подключения к серверу:', error);
       setConnectionStatus('disconnected');
     });
     
+    // Обработка отключения
     newSocket.on('disconnect', (reason) => {
       console.log('Отключились от сервера:', reason);
       setConnectionStatus('disconnected');
     });
+
+    // Обработка ошибок
+    newSocket.on('error', (error) => {
+      console.error('Ошибка сокета:', error);
+      setConnectionStatus('disconnected');
+    });
     
     setSocket(newSocket);
-    setKey(prev => prev + 1); // Принудительно пересоздаем компонент
+    setKey(prev => prev + 1);
   }, [socket]);
 
   useEffect(() => {
@@ -971,6 +988,7 @@ function App() {
     
     return () => {
       if (socket) {
+        console.log('Очистка сокета при размонтировании');
         socket.disconnect();
       }
     };
@@ -981,7 +999,10 @@ function App() {
     setUser(userData);
     
     if (socket && socket.connected) {
+      console.log('Отправка данных пользователя на сервер');
       socket.emit('user_login', userData);
+    } else {
+      console.error('Сокет не подключен, невозможно отправить данные');
     }
   };
 
@@ -1008,9 +1029,10 @@ function App() {
           user={user} 
           socket={socket} 
           onReconnect={handleReconnect}
+          connectionStatus={connectionStatus}
         />
       ) : (
-        <LoginForm onLogin={handleLogin} />
+        <LoginForm onLogin={handleLogin} connectionStatus={connectionStatus} />
       )}
     </ErrorBoundary>
   );
