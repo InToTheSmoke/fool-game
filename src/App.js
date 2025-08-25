@@ -343,33 +343,35 @@ const FoolGame = ({ user, socket, onReconnect, connectionStatus }) => {
     }, 3000);
   }, [onReconnect]);
 
-  // Обработка сообщений от сервера
-  useEffect(() => {
-    if (!socket) {
-      setError('Нет подключения к серверу');
-      attemptReconnect();
-      return;
+ // Обработка сообщений от сервера
+useEffect(() => {
+  if (!socket) {
+    setError('Нет подключения к серверу');
+    attemptReconnect();
+    return;
+  }
+  
+  console.log('Настройка обработчиков событий сокета для комнаты');
+  
+  const handleGameUpdate = (state) => {
+    console.log('Получено обновление игры:', state);
+    setGameState(state);
+    setGamePhase(state.gamePhase);
+    setError('');
+    setBetStatus('idle');
+    
+    if (betTimeoutRef.current) {
+      clearTimeout(betTimeoutRef.current);
+      betTimeoutRef.current = null;
     }
-    
-    const handleGameUpdate = (state) => {
-      console.log('Получено обновление игры:', state);
-      setGameState(state);
-      setGamePhase(state.gamePhase);
-      setError('');
-      setBetStatus('idle');
-      
-      if (betTimeoutRef.current) {
-        clearTimeout(betTimeoutRef.current);
-        betTimeoutRef.current = null;
-      }
-    };
-    
-    const handleRoomCreated = (id) => {
-      console.log('Комната создана:', id);
-      setRoomId(id);
-      setGamePhase('waiting');
-      setError('');
-    };
+  };
+  
+  const handleRoomCreated = (id) => {
+    console.log('Комната создана успешно, ID:', id);
+    setRoomId(id);
+    setGamePhase('waiting');
+    setError('');
+  };
     
     const handlePlayerDisconnected = () => {
       console.log('Игрок отключился');
@@ -424,16 +426,16 @@ const FoolGame = ({ user, socket, onReconnect, connectionStatus }) => {
       }
     };
     
-    // Назначаем обработчики событий
-    socket.on('connect', handleConnect);
-    socket.on('connected', handleConnected);
-    socket.on('disconnect', handleDisconnect);
-    socket.on('game_update', handleGameUpdate);
-    socket.on('room_created', handleRoomCreated);
-    socket.on('player_disconnected', handlePlayerDisconnected);
-    socket.on('error', handleSocketError);
-    socket.on('pong', handlePong);
-    socket.on('bet_result', handleBetResult);
+   // Назначаем обработчики событий
+  socket.on('connect', handleConnect);
+  socket.on('connected', handleConnected);
+  socket.on('disconnect', handleDisconnect);
+  socket.on('game_update', handleGameUpdate);
+  socket.on('room_created', handleRoomCreated);
+  socket.on('player_disconnected', handlePlayerDisconnected);
+  socket.on('error', handleSocketError);
+  socket.on('pong', handlePong);
+  socket.on('bet_result', handleBetResult);
     
     // Инициализируем подключение
     if (socket.disconnected) {
@@ -441,18 +443,20 @@ const FoolGame = ({ user, socket, onReconnect, connectionStatus }) => {
     }
     
     // Очистка обработчиков при размонтировании
-    return () => {
-      socket.off('connect', handleConnect);
-      socket.off('connected', handleConnected);
-      socket.off('disconnect', handleDisconnect);
-      socket.off('game_update', handleGameUpdate);
-      socket.off('room_created', handleRoomCreated);
-      socket.off('player_disconnected', handlePlayerDisconnected);
-      socket.off('error', handleSocketError);
-      socket.off('pong', handlePong);
-      socket.off('bet_result', handleBetResult);
-    };
-  }, [socket, user, roomId, attemptReconnect]);
+  return () => {
+    console.log('Очистка обработчиков событий');
+    socket.off('connect', handleConnect);
+    socket.off('connected', handleConnected);
+    socket.off('disconnect', handleDisconnect);
+    socket.off('game_update', handleGameUpdate);
+    socket.off('room_created', handleRoomCreated);
+    socket.off('player_disconnected', handlePlayerDisconnected);
+    socket.off('error', handleSocketError);
+    socket.off('pong', handlePong);
+    socket.off('bet_result', handleBetResult);
+  };
+}, [socket, user, roomId, attemptReconnect]);
+
   
   // Размещение ставки с таймаутом
   useEffect(() => {
@@ -494,15 +498,15 @@ const FoolGame = ({ user, socket, onReconnect, connectionStatus }) => {
   }, [socket, roomId]);
 
   // Создание комнаты
-  const createRoom = () => {
-    if (!socket || socket.disconnected) {
-      setError('Нет подключения к серверу');
-      attemptReconnect();
-      return;
-    }
-    console.log('Создание комнаты');
-    socket.emit('create_room');
-  };
+const createRoom = () => {
+  if (!socket || socket.disconnected) {
+    setError('Нет подключения к серверу');
+    attemptReconnect();
+    return;
+  }
+  console.log('Отправка запроса на создание комнаты...');
+  socket.emit('create_room');
+};
 
   // Подключение к комнате
   const joinRoom = () => {
@@ -1099,16 +1103,24 @@ function App() {
   }, []);
 
   const handleLogin = (userData) => {
-    console.log('Пользователь вошел:', userData);
-    setUser(userData);
+  console.log('Пользователь вошел:', userData);
+  setUser(userData);
+  
+  if (socket && socket.connected) {
+    console.log('Отправка данных пользователя на сервер...');
+    socket.emit('user_login', userData);
     
-    if (socket && socket.connected) {
-      console.log('Отправка данных пользователя на сервер');
-      socket.emit('user_login', userData);
-    } else {
-      console.error('Сокет не подключен, невозможно отправить данные');
-    }
-  };
+    // Проверяем, получил ли сервер данные
+    setTimeout(() => {
+      if (!roomId) {
+        console.log('Проверка: пользовательские данные должны быть на сервере');
+      }
+    }, 1000);
+  } else {
+    console.error('Сокет не подключен, невозможно отправить данные');
+    setError('Нет подключения к серверу');
+  }
+};
 
   const handleReconnect = () => {
     console.log('Принудительное переподключение');
