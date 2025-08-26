@@ -607,7 +607,7 @@ const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`=== СЕРВЕР ЗАПУЩЕН НА ПОРТУ ${PORT} ===`);
-  console.log(`Время запуска: ${new Date().toISOString()});
+  console.log(`Время запуска: ${new Date().toISOString()}`);
   console.log(`Режим: ${process.env.NODE_ENV || 'development'}`);
   console.log(`Доступные API endpoints:`);
   console.log(`- GET /api - Информация о сервере`);
