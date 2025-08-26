@@ -353,24 +353,24 @@ const FoolGame = ({ user, socket, onReconnect, connectionStatus }) => {
       }
     };
     
-    const handleRoomCreated = (id) => {
-      console.log('Комната создана успешно, ID:', id);
-      setRoomId(id);
-      setGamePhase('waiting');
-      setError('');
-    };
+const handleRoomCreated = (data) => {
+  console.log('Комната создана успешно, ID:', data.roomId);
+  setRoomId(data.roomId);
+  setGamePhase('waiting');
+  setError('');
+};
     
-    const handlePlayerDisconnected = () => {
-      console.log('Игрок отключился');
-      setGamePhase('lobby');
-      setGameState(null);
-      setError('Соперник отключился. Возвращаемся в лобби.');
-    };
+const handlePlayerDisconnected = (data) => {
+  console.log('Игрок отключился');
+  setGamePhase('lobby');
+  setGameState(null);
+  setError(data.message || 'Соперник отключился. Возвращаемся в лобби.');
+};
     
-    const handleSocketError = (message) => {
-      console.error('Ошибка сокета:', message);
-      setError(message);
-    };
+const handleSocketError = (data) => {
+  console.error('Ошибка сокета:', data.message);
+  setError(data.message);
+};
     
     const handleConnect = () => {
       console.log('Подключено к серверу');
@@ -406,34 +406,34 @@ const FoolGame = ({ user, socket, onReconnect, connectionStatus }) => {
       console.log('Сервер активен');
     };
     
-    const handleBetResult = (result) => {
-      console.log('Результат ставки:', result);
-      if (result.success) {
-        setBetStatus('success');
-      } else {
-        setBetStatus('error');
-        setError(result.message || 'Ошибка при размещении ставки');
-      }
-    };
+const handleBetResult = (result) => {
+  console.log('Результат ставки:', result);
+  if (result.success) {
+    setBetStatus('success');
+  } else {
+    setBetStatus('error');
+    setError(result.message || 'Ошибка при размещении ставки');
+  }
+};
 
-    const handleLoginSuccess = (userData) => {
-      console.log('Успешный вход пользователя:', userData);
-      setIsLoggedIn(true);
-      if (loginTimeoutRef.current) {
-        clearTimeout(loginTimeoutRef.current);
-        loginTimeoutRef.current = null;
-      }
-    };
+const handleLoginSuccess = (data) => {
+  console.log('Успешный вход пользователя:', data.user);
+  setIsLoggedIn(true);
+  if (loginTimeoutRef.current) {
+    clearTimeout(loginTimeoutRef.current);
+    loginTimeoutRef.current = null;
+  }
+};
 
-    const handleLoginError = (errorMessage) => {
-      console.error('Ошибка входа:', errorMessage);
-      setError(errorMessage);
-      setIsLoggedIn(false);
-      if (loginTimeoutRef.current) {
-        clearTimeout(loginTimeoutRef.current);
-        loginTimeoutRef.current = null;
-      }
-    };
+const handleLoginError = (data) => {
+  console.error('Ошибка входа:', data.message);
+  setError(data.message);
+  setIsLoggedIn(false);
+  if (loginTimeoutRef.current) {
+    clearTimeout(loginTimeoutRef.current);
+    loginTimeoutRef.current = null;
+  }
+};
     
     // Назначаем обработчики событий
     socket.on('connect', handleConnect);
@@ -1098,11 +1098,11 @@ function App() {
       setError('');
     });
     
-    newSocket.on('connect_error', (error) => {
-      console.error('Ошибка подключения к серверу:', error);
-      setConnectionStatus('disconnected');
-      setError('Ошибка подключения к серверу');
-    });
+newSocket.on('connect_error', (errorData) => {
+  console.error('Ошибка подключения к серверу:', errorData);
+  setConnectionStatus('disconnected');
+  setError(errorData.message || 'Ошибка подключения к серверу');
+});
     
     newSocket.on('disconnect', (reason) => {
       console.log('Отключились от сервера:', reason);
@@ -1110,11 +1110,11 @@ function App() {
       setError('Отключено от сервера');
     });
 
-    newSocket.on('error', (error) => {
-      console.error('Ошибка сокета:', error);
-      setConnectionStatus('disconnected');
-      setError('Ошибка соединения с сервером');
-    });
+newSocket.on('error', (errorData) => {
+  console.error('Ошибка сокета:', errorData);
+  setConnectionStatus('disconnected');
+  setError(errorData.message || 'Ошибка соединения с сервером');
+});
     
     setSocket(newSocket);
     setKey(prev => prev + 1);
