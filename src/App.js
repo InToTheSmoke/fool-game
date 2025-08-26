@@ -833,6 +833,7 @@ const handleLoginError = (data) => {
   const playerIndex = gameState.players.findIndex(p => p.id === socket.id);
 if (playerIndex === -1) return <div>Ошибка: игрок не найден</div>;
 
+const isDefenderTurn = gameState.gamePhase === 'defending' && gameState.currentPlayer === playerIndex;
 const isPlayerTurn = gameState.currentPlayer === playerIndex;
   const opponentIndex = (playerIndex + 1) % 2;
 
@@ -887,47 +888,53 @@ const isPlayerTurn = gameState.currentPlayer === playerIndex;
         
         {/* Элементы управления */}
         <div style={styles.controls}>
-          <button 
-            style={{
-              ...styles.button,
-              ...(!(gameState.gamePhase === 'attacking' && isPlayerTurn) ? styles.buttonDisabled : {})
-            }}
-            onClick={attack}
-            disabled={!(gameState.gamePhase === 'attacking' && isPlayerTurn)}
-          >
-            Атаковать
-          </button>
-          <button 
-            style={{
-              ...styles.button,
-              ...(!(gameState.gamePhase === 'defending' && isPlayerTurn) ? styles.buttonDisabled : {})
-            }}
-            onClick={defend}
-            disabled={!(gameState.gamePhase === 'defending' && isPlayerTurn)}
-          >
-            Защищаться
-          </button>
-          <button 
-            style={{
-              ...styles.button,
-              ...(!(gameState.gamePhase === 'defending' && isPlayerTurn) ? styles.buttonDisabled : {})
-            }}
-            onClick={takeCards}
-            disabled={!(gameState.gamePhase === 'defending' && isPlayerTurn)}
-          >
-            Взять
-          </button>
-          <button 
-            style={{
-              ...styles.button,
-              ...(!(gameState.gamePhase === 'attacking' && isPlayerTurn) ? styles.buttonDisabled : {})
-            }}
-            onClick={pass}
-            disabled={!(gameState.gamePhase === 'attacking' && isPlayerTurn)}
-          >
-            Пас
-          </button>
-        </div>
+  <button 
+    style={{
+      ...styles.button,
+      ...(!(
+        (gameState.gamePhase === 'attacking' && isPlayerTurn) || 
+        (gameState.table.length > 0 && !isDefenderTurn)
+      ) ? styles.buttonDisabled : {})
+    }}
+    onClick={attack}
+    disabled={!(
+      (gameState.gamePhase === 'attacking' && isPlayerTurn) || 
+      (gameState.table.length > 0 && !isDefenderTurn)
+    )}
+  >
+    {gameState.table.length > 0 ? 'Подкинуть' : 'Атаковать'}
+  </button>
+  <button 
+    style={{
+      ...styles.button,
+      ...(!(gameState.gamePhase === 'defending' && isDefenderTurn) ? styles.buttonDisabled : {})
+    }}
+    onClick={defend}
+    disabled={!(gameState.gamePhase === 'defending' && isDefenderTurn)}
+  >
+    Защищаться
+  </button>
+  <button 
+    style={{
+      ...styles.button,
+      ...(!(gameState.gamePhase === 'defending' && isDefenderTurn) ? styles.buttonDisabled : {})
+    }}
+    onClick={takeCards}
+    disabled={!(gameState.gamePhase === 'defending' && isDefenderTurn)}
+  >
+    Взять
+  </button>
+  <button 
+    style={{
+      ...styles.button,
+      ...(!(gameState.gamePhase === 'attacking' && isPlayerTurn && gameState.table.length === 0) ? styles.buttonDisabled : {})
+    }}
+    onClick={pass}
+    disabled={!(gameState.gamePhase === 'attacking' && isPlayerTurn && gameState.table.length === 0)}
+  >
+    Пас
+  </button>
+</div>
         
         {/* Сообщения игры */}
         <div style={styles.message}>
