@@ -340,18 +340,18 @@ const FoolGame = ({ user, socket, onReconnect, connectionStatus }) => {
     
     console.log('Настройка обработчиков событий сокета для комнаты');
     
-    const handleGameUpdate = (state) => {
-      console.log('Получено обновление игры:', state);
-      setGameState(state);
-      setGamePhase(state.gamePhase);
-      setError('');
-      setBetStatus('idle');
-      
-      if (betTimeoutRef.current) {
-        clearTimeout(betTimeoutRef.current);
-        betTimeoutRef.current = null;
-      }
-    };
+  const handleGameUpdate = (state) => {
+  console.log('Получено обновление игры:', state);
+  setGameState(state);
+  setGamePhase(state.gamePhase);
+  setError('');
+  setBetStatus('idle');
+  
+  if (betTimeoutRef.current) {
+    clearTimeout(betTimeoutRef.current);
+    betTimeoutRef.current = null;
+  }
+};
     
 const handleRoomCreated = (data) => {
   console.log('Комната создана успешно, ID:', data.roomId);
@@ -831,9 +831,9 @@ const handleLoginError = (data) => {
   if (!gameState) return <div style={styles.loading}>Загрузка игры...</div>;
 
   const playerIndex = gameState.players.findIndex(p => p.id === socket.id);
-  if (playerIndex === -1) return <div>Ошибка: игрок не найден</div>;
+if (playerIndex === -1) return <div>Ошибка: игрок не найден</div>;
 
-  const isPlayerTurn = gameState.currentPlayer === playerIndex;
+const isPlayerTurn = gameState.currentPlayer === playerIndex;
   const opponentIndex = (playerIndex + 1) % 2;
 
   return (
