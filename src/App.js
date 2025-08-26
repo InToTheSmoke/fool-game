@@ -224,7 +224,6 @@ const styles = {
   }
 };
 
-// Error Boundary для отлова ошибок
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -263,7 +262,7 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-
+// Компонент карты
 const Card = React.memo(({ value, suit, onClick, style = {} }) => {
   const [isHovered, setIsHovered] = useState(false);
   
@@ -306,6 +305,7 @@ const FoolGame = ({ user, socket, onReconnect, connectionStatus }) => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const betTimeoutRef = useRef(null);
   const wakeUpIntervalRef = useRef(null);
+  const loginTimeoutRef = useRef(null);
 
   // Функция для "пробуждения" сервера
   const wakeUpServer = useCallback(() => {
@@ -324,6 +324,9 @@ const FoolGame = ({ user, socket, onReconnect, connectionStatus }) => {
       }
       if (betTimeoutRef.current) {
         clearTimeout(betTimeoutRef.current);
+      }
+      if (loginTimeoutRef.current) {
+        clearTimeout(loginTimeoutRef.current);
       }
     };
   }, [wakeUpServer]);
@@ -376,6 +379,15 @@ const FoolGame = ({ user, socket, onReconnect, connectionStatus }) => {
       if (user) {
         console.log('Отправка данных пользователя на сервер');
         socket.emit('user_login', user);
+        
+        // Таймаут для ожидания подтверждения входа
+        loginTimeoutRef.current = setTimeout(() => {
+          if (!isLoggedIn) {
+            console.log('Таймаут ожидания подтверждения входа');
+            setError('Не удалось войти в систему. Попробуйте переподключиться.');
+            setIsLoggedIn(true); // Принудительно продолжаем, чтобы не зависнуть
+          }
+        }, 5000);
       }
     };
     
@@ -407,15 +419,23 @@ const FoolGame = ({ user, socket, onReconnect, connectionStatus }) => {
     const handleLoginSuccess = (userData) => {
       console.log('Успешный вход пользователя:', userData);
       setIsLoggedIn(true);
+      if (loginTimeoutRef.current) {
+        clearTimeout(loginTimeoutRef.current);
+        loginTimeoutRef.current = null;
+      }
     };
 
     const handleLoginError = (errorMessage) => {
       console.error('Ошибка входа:', errorMessage);
       setError(errorMessage);
       setIsLoggedIn(false);
+      if (loginTimeoutRef.current) {
+        clearTimeout(loginTimeoutRef.current);
+        loginTimeoutRef.current = null;
+      }
     };
-
-   // Назначаем обработчики событий
+    
+    // Назначаем обработчики событий
     socket.on('connect', handleConnect);
     socket.on('connected', handleConnected);
     socket.on('disconnect', handleDisconnect);
@@ -448,7 +468,7 @@ const FoolGame = ({ user, socket, onReconnect, connectionStatus }) => {
       socket.off('login_success', handleLoginSuccess);
       socket.off('login_error', handleLoginError);
     };
-  }, [socket, user]);
+  }, [socket, user, isLoggedIn]);
   
   // Размещение ставки с таймаутом
   useEffect(() => {
@@ -496,11 +516,6 @@ const FoolGame = ({ user, socket, onReconnect, connectionStatus }) => {
       return;
     }
 
-    if (!isLoggedIn) {
-      setError('Сначала необходимо войти в систему');
-      return;
-    }
-
     console.log('Отправка запроса на создание комнаты...');
     socket.emit('create_room');
   };
@@ -513,11 +528,6 @@ const FoolGame = ({ user, socket, onReconnect, connectionStatus }) => {
     }
     if (!socket || socket.disconnected) {
       setError('Нет подключения к серверу');
-      return;
-    }
-
-    if (!isLoggedIn) {
-      setError('Сначала необходимо войти в систему');
       return;
     }
 
@@ -685,7 +695,21 @@ const FoolGame = ({ user, socket, onReconnect, connectionStatus }) => {
         </div>
         
         <div style={styles.lobby}>
-          {!isLoggedIn && <p>Ожидание подтверждения входа...</p>}
+          {!isLoggedIn && (
+            <div style={styles.loading}>
+              <p>Ожидание подтверждения входа...</p>
+              <button 
+                style={styles.reconnectButton}
+                onClick={() => {
+                  if (socket && user) {
+                    socket.emit('user_login', user);
+                  }
+                }}
+              >
+                Повторить вход
+              </button>
+            </div>
+          )}
           
           <button 
             style={{
