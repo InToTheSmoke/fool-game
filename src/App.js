@@ -813,7 +813,7 @@ function App() {
       socket.emit('user_login', userWithId);
     } else {
       console.error('Сокет не подключен, невозможно отправить данные');
-      setError('Нет подключения к серверу');
+      // setError ('Нет подключения к серверу');
     }
   };
 
