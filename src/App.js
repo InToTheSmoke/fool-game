@@ -738,6 +738,7 @@ function App() {
   const [user, setUser] = useState(null);
   const [socket, setSocket] = useState(null);
   const [connectionStatus, setConnectionStatus] = useState('connecting');
+  const [error, setError] = useState(''); // Добавляем состояние для ошибок
   const [key, setKey] = useState(0);
 
   const createSocketConnection = useCallback(() => {
@@ -798,8 +799,7 @@ function App() {
       }
     };
   }, []);
-
-  const handleLogin = (userData) => {
+const handleLogin = (userData) => {
     console.log('Пользователь вошел:', userData);
     // Генерируем ID на клиенте, но сервер перезапишет его на socket.id
     const userWithId = {
@@ -813,7 +813,7 @@ function App() {
       socket.emit('user_login', userWithId);
     } else {
       console.error('Сокет не подключен, невозможно отправить данные');
-      // setError ('Нет подключения к серверу');
+      setError('Нет подключения к серверу'); // Теперь setError определен
     }
   };
 
