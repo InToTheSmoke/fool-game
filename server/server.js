@@ -285,67 +285,61 @@ io.on('connection', (socket) => {
     }
   });
   
- // Атака
-socket.on('attack', (data) => {
-  try {
-    const { roomId, card } = data;
-    const room = rooms.get(roomId);
-    
-    if (!room) {
-      socket.emit('error', { message: 'Комната не найдена' });
-      return;
-    }
-    
-    if (room.gamePhase !== 'attacking') {
-      socket.emit('error', { message: 'Сейчас не фаза атаки' });
-      return;
-    }
-    
-    const playerIndex = room.players.findIndex(p => p.id === socket.id);
-    if (playerIndex !== room.currentPlayer) {
-      socket.emit('error', { message: 'Сейчас не ваш ход' });
-      return;
-    }
-    
-    const player = room.players[playerIndex];
-    
-    // Проверяем, есть ли карта у игрока
-    const cardIndex = player.cards.findIndex(c => 
-      c.value === card.value && c.suit === card.suit
-    );
-    
-    if (cardIndex === -1) {
-      socket.emit('error', { message: 'У вас нет этой карты' });
-      return;
-    }
-    
-    // Убираем карту из руки игрока
-    player.cards.splice(cardIndex, 1);
-    
-    // Добавляем карту на стол
-    room.table.push({
-      card,
-      player: playerIndex,
-      type: 'attack'
-    });
-    
-    // Переходим к фазе защиты
-    room.gamePhase = 'defending';
-    
-    // Меняем текущего игрока на защищающегося (следующего игрока)
-    room.currentPlayer = (playerIndex + 1) % room.players.length;
-    
-    // Отправляем обновление игры
-    io.to(roomId).emit('game_update', room);
-    
-    console.log(`Игрок ${player.name} атаковал картой ${card.value}${card.suit}`);
-  } catch (error) {
-    console.error('Ошибка при атаке:', error);
-    socket.emit('error', { message: 'Ошибка при атаке' });
-  }
-});
+  // Атака
+  socket.on('attack', (data) => {
+    try {
+      const { roomId, card } = data;
+      const room = rooms.get(roomId);
+      
+      if (!room) {
+        socket.emit('error', { message: 'Комната не найдена' });
+        return;
+      }
+      
+      if (room.gamePhase !== 'attacking') {
+        socket.emit('error', { message: 'Сейчас не фаза атаки' });
+        return;
+      }
+      
+      const playerIndex = room.players.findIndex(p => p.id === socket.id);
+      if (playerIndex !== room.currentPlayer) {
+        socket.emit('error', { message: 'Сейчас не ваш ход' });
+        return;
+      }
+      
+      const player = room.players[playerIndex];
+      
+      // Проверяем, есть ли карта у игрока
+      const cardIndex = player.cards.findIndex(c => 
+        c.value === card.value && c.suit === card.suit
+      );
+      
+      if (cardIndex === -1) {
+        socket.emit('error', { message: 'У вас нет этой карты' });
+        return;
+      }
+      
+      // Убираем карту из руки игрока
+      player.cards.splice(cardIndex, 1);
+      
+      // Добавляем карту на стол
+      room.table.push({
+        card,
+        player: playerIndex,
+        type: 'attack'
+      });
+      
+      // Переходим к фазе защиты
+      room.gamePhase = 'defending';
+      
+      // Меняем текущего игрока на защищающегося (следующего игрока)
+      room.currentPlayer = (playerIndex + 1) % room.players.length;
+      
+      // Отправляем обновление игры
+      io.to(roomId).emit('game_update', room);
       
       console.log(`Игрок ${player.name} атаковал картой ${card.value}${card.suit}`);
+      console.log(`Текущий игрок изменен на: ${room.currentPlayer}, фаза: ${room.gamePhase}`);
     } catch (error) {
       console.error('Ошибка при атаке:', error);
       socket.emit('error', { message: 'Ошибка при атаке' });
@@ -353,91 +347,93 @@ socket.on('attack', (data) => {
   });
   
   // Защита
-socket.on('defend', (data) => {
-  try {
-    const { roomId, card } = data;
-    const room = rooms.get(roomId);
-    
-    if (!room) {
-      socket.emit('error', { message: 'Комната не найдена' });
-      return;
-    }
-    
-    if (room.gamePhase !== 'defending') {
-      socket.emit('error', { message: 'Сейчас не фаза защиты' });
-      return;
-    }
-    
-    const playerIndex = room.players.findIndex(p => p.id === socket.id);
-    if (playerIndex !== room.currentPlayer) {
-      socket.emit('error', { message: 'Сейчас не ваша очередь защищаться' });
-      return;
-    }
-    
-    const player = room.players[playerIndex];
-    const attackingCard = room.table[room.table.length - 1].card;
-    
-    // Проверяем, может ли карта побить атакующую
-    const canBeat = (
-      card.suit === room.trumpCard.suit && attackingCard.suit !== room.trumpCard.suit
-    ) || (
-      card.suit === attackingCard.suit && getCardValue(card.value) > getCardValue(attackingCard.value)
-    );
-    
-    if (!canBeat) {
-      socket.emit('error', { message: 'Эта карта не может побить атакующую' });
-      return;
-    }
-    
-    // Проверяем, есть ли карта у игрока
-    const cardIndex = player.cards.findIndex(c => 
-      c.value === card.value && c.suit === card.suit
-    );
-    
-    if (cardIndex === -1) {
-      socket.emit('error', { message: 'У вас нет этой карты' });
-      return;
-    }
-    
-    // Убираем карту из руки игрока
-    player.cards.splice(cardIndex, 1);
-    
-    // Добавляем карту на стол
-    room.table.push({
-      card,
-      player: playerIndex,
-      type: 'defense'
-    });
-    
-    // Проверяем, закончилась ли защита (все карты отбиты или достигнут лимит)
-    const attackCards = room.table.filter(item => item.type === 'attack').length;
-    const defenseCards = room.table.filter(item => item.type === 'defense').length;
-    
-    if (defenseCards >= attackCards || room.table.length >= 12) {
-      // Завершаем раунд
-      room.table = [];
-      room.gamePhase = 'attacking';
+  socket.on('defend', (data) => {
+    try {
+      const { roomId, card } = data;
+      const room = rooms.get(roomId);
       
-      // Ход переходит к следующему игроку (защищавшемуся)
-      room.currentPlayer = playerIndex;
+      if (!room) {
+        socket.emit('error', { message: 'Комната не найдена' });
+        return;
+      }
       
-      // Добираем карты
-      room.players.forEach(player => {
-        while (player.cards.length < 6 && room.deck.length > 0) {
-          player.cards.push(room.deck.shift());
-        }
+      if (room.gamePhase !== 'defending') {
+        socket.emit('error', { message: 'Сейчас не фаза защиты' });
+        return;
+      }
+      
+      const playerIndex = room.players.findIndex(p => p.id === socket.id);
+      if (playerIndex !== room.currentPlayer) {
+        socket.emit('error', { message: 'Сейчас не ваша очередь защищаться' });
+        return;
+      }
+      
+      const player = room.players[playerIndex];
+      const attackingCard = room.table[room.table.length - 1].card;
+      
+      // Проверяем, может ли карта побить атакующую
+      const canBeat = (
+        card.suit === room.trumpCard.suit && attackingCard.suit !== room.trumpCard.suit
+      ) || (
+        card.suit === attackingCard.suit && getCardValue(card.value) > getCardValue(attackingCard.value)
+      );
+      
+      if (!canBeat) {
+        socket.emit('error', { message: 'Эта карта не может побить атакующую' });
+        return;
+      }
+      
+      // Проверяем, есть ли карта у игрока
+      const cardIndex = player.cards.findIndex(c => 
+        c.value === card.value && c.suit === card.suit
+      );
+      
+      if (cardIndex === -1) {
+        socket.emit('error', { message: 'У вас нет этой карты' });
+        return;
+      }
+      
+      // Убираем карту из руки игрока
+      player.cards.splice(cardIndex, 1);
+      
+      // Добавляем карту на стол
+      room.table.push({
+        card,
+        player: playerIndex,
+        type: 'defense'
       });
+      
+      // Проверяем, закончилась ли защита (все карты отбиты или достигнут лимит)
+      const attackCards = room.table.filter(item => item.type === 'attack').length;
+      const defenseCards = room.table.filter(item => item.type === 'defense').length;
+      
+      if (defenseCards >= attackCards || room.table.length >= 12) {
+        // Завершаем раунд
+        room.table = [];
+        room.gamePhase = 'attacking';
+        
+        // Ход переходит к следующему игроку (защищавшемуся)
+        room.currentPlayer = playerIndex;
+        
+        // Добираем карты
+        room.players.forEach(player => {
+          while (player.cards.length < 6 && room.deck.length > 0) {
+            player.cards.push(room.deck.shift());
+          }
+        });
+        
+        console.log(`Раунд завершен. Текущий игрок: ${room.currentPlayer}, фаза: ${room.gamePhase}`);
+      }
+      
+      // Отправляем обновление игры
+      io.to(roomId).emit('game_update', room);
+      
+      console.log(`Игрок ${player.name} защитился картой ${card.value}${card.suit}`);
+    } catch (error) {
+      console.error('Ошибка при защите:', error);
+      socket.emit('error', { message: 'Ошибка при защите' });
     }
-    
-    // Отправляем обновление игры
-    io.to(roomId).emit('game_update', room);
-    
-    console.log(`Игрок ${player.name} защитился картой ${card.value}${card.suit}`);
-  } catch (error) {
-    console.error('Ошибка при защите:', error);
-    socket.emit('error', { message: 'Ошибка при защите' });
-  }
-});
+  });
   
   // Взять карты
   socket.on('take_cards', (roomId) => {
@@ -569,7 +565,7 @@ socket.on('defend', (data) => {
         if (playerIndex !== -1) {
           // Уведомляем другого игрока о отключении
           room.players.splice(playerIndex, 1);
-          io.to(roomId).emit('player_disconnected');
+          io.to(roomId).emit('player_disconnected', { message: 'Игрок отключился' });
           
           // Если комната пустая, удаляем ее
           if (room.players.length === 0) {
@@ -611,7 +607,7 @@ const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`=== СЕРВЕР ЗАПУЩЕН НА ПОРТУ ${PORT} ===`);
-  console.log(`Время запуска: ${new Date().toISOString()}`);
+  console.log(`Время запуска: ${new Date().toISOString()});
   console.log(`Режим: ${process.env.NODE_ENV || 'development'}`);
   console.log(`Доступные API endpoints:`);
   console.log(`- GET /api - Информация о сервере`);
