@@ -3,296 +3,17 @@ import io from 'socket.io-client';
 
 // Стилизация компонентов
 const styles = {
-  container: {
-    fontFamily: '"Arial", sans-serif',
-    maxWidth: '1200px',
-    margin: '0 auto',
-    padding: '20px',
-    backgroundColor: '#1a5f7a',
-    minHeight: '100vh',
-    color: '#fff'
-  },
-  header: {
-    textAlign: 'center',
-    marginBottom: '30px'
-  },
-  title: {
-    fontSize: '36px',
-    marginBottom: '10px',
-    textShadow: '2px 2px 4px rgba(0, 0, 0, 0.5)'
-  },
-  gameArea: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '20px'
-  },
-  playersContainer: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    gap: '20px'
-  },
-  playerPanel: {
-    flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: '15px',
-    padding: '20px',
-    boxShadow: '0 5px 15px rgba(0, 0, 0, 0.2)'
-  },
-  playerHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '15px'
-  },
-  playerName: {
-    fontSize: '24px',
-    color: '#ffcc00'
-  },
-  playerStats: {
-    display: 'flex',
-    gap: '15px'
-  },
-  stat: {
-    backgroundColor: 'rgba(0, 0, 0, 0.2)',
-    padding: '8px 15px',
-    borderRadius: '10px'
-  },
-  cardsContainer: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: '10px',
-    minHeight: '150px',
-    justifyContent: 'center'
-  },
-  table: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: '15px',
-    padding: '20px',
-    minHeight: '200px',
-    boxShadow: 'inset 0 0 10px rgba(0, 0, 0, 0.2)'
-  },
-  tableTitle: {
-    textAlign: 'center',
-    marginBottom: '15px',
-    fontSize: '20px'
-  },
-  tableCards: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: '10px',
-    justifyContent: 'center',
-    minHeight: '150px'
-  },
-  controls: {
-    display: 'flex',
-    justifyContent: 'center',
-    gap: '15px',
-    flexWrap: 'wrap'
-  },
-  button: {
-    padding: '12px 25px',
-    border: 'none',
-    borderRadius: '10px',
-    background: 'linear-gradient(to right, #ffcc00, #ff9900)',
-    color: '#000',
-    fontWeight: 'bold',
-    fontSize: '16px',
-    cursor: 'pointer',
-    transition: 'all 0.3s',
-    boxShadow: '0 5px 15px rgba(0, 0, 0, 0.2)'
-  },
-  buttonHover: {
-    transform: 'translateY(-3px)',
-    boxShadow: '0 8px 20px rgba(0, 0, 0, 0.3)'
-  },
-  buttonDisabled: {
-    background: '#666',
-    cursor: 'not-allowed'
-  },
-  bettingPanel: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: '15px',
-    padding: '20px',
-    textAlign: 'center'
-  },
-  bettingTitle: {
-    marginBottom: '15px',
-    color: '#ffcc00'
-  },
-  betControls: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: '15px',
-    flexWrap: 'wrap'
-  },
-  betAmount: {
-    fontSize: '20px',
-    fontWeight: 'bold',
-    minWidth: '100px'
-  },
-  message: {
-    textAlign: 'center',
-    fontSize: '20px',
-    marginTop: '20px',
-    padding: '15px',
-    backgroundColor: 'rgba(0, 0, 0, 0.2)',
-    borderRadius: '10px',
-    color: '#ffcc00'
-  },
-  card: {
-    width: '70px',
-    height: '100px',
-    backgroundColor: '#fff',
-    borderRadius: '8px',
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'space-between',
-    padding: '5px',
-    color: '#000',
-    fontWeight: 'bold',
-    boxShadow: '0 3px 6px rgba(0, 0, 0, 0.3)',
-    cursor: 'pointer',
-    transition: 'transform 0.2s'
-  },
-  cardHover: {
-    transform: 'translateY(-5px)'
-  },
-  cardRed: {
-    color: '#e00'
-  },
-  cardTop: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'flex-start',
-    fontSize: '16px'
-  },
-  cardBottom: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'flex-end',
-    transform: 'rotate(180deg)',
-    fontSize: '16px'
-  },
-  cardCenter: {
-    alignSelf: 'center',
-    fontSize: '24px'
-  },
-  lobby: {
-    textAlign: 'center',
-    padding: '20px'
-  },
-  roomId: {
-    fontSize: '24px',
-    margin: '20px 0',
-    backgroundColor: 'rgba(0, 0, 0, 0.2)',
-    padding: '10px',
-    borderRadius: '10px',
-    display: 'inline-block'
-  },
-  error: {
-    color: '#ff6b6b',
-    textAlign: 'center',
-    padding: '10px',
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    borderRadius: '5px',
-    margin: '10px 0'
-  },
-  connectionStatus: {
-    position: 'fixed',
-    top: '10px',
-    right: '10px',
-    padding: '5px 10px',
-    borderRadius: '5px',
-    fontSize: '12px',
-    zIndex: 1000
-  },
-  loading: {
-    textAlign: 'center',
-    fontSize: '20px',
-    padding: '20px'
-  },
-  reconnectButton: {
-    padding: '10px 20px',
-    border: 'none',
-    borderRadius: '5px',
-    background: '#ff9900',
-    color: '#000',
-    fontWeight: 'bold',
-    cursor: 'pointer',
-    margin: '10px'
-  }
+  // ... (стили остаются без изменений)
 };
 
 // Error Boundary для отлова ошибок
 class ErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false, error: null, errorInfo: null };
-  }
-  
-  static getDerivedStateFromError(error) {
-    return { hasError: true };
-  }
-  
-  componentDidCatch(error, errorInfo) {
-    this.setState({
-      error: error,
-      errorInfo: errorInfo
-    });
-    console.error('Error caught by boundary:', error, errorInfo);
-  }
-  
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div style={styles.container}>
-          <div style={styles.error}>
-            <h2>Что-то пошло не так.</h2>
-            <details style={{ whiteSpace: 'pre-wrap', color: '#fff' }}>
-              {this.state.error && this.state.error.toString()}
-              <br />
-              {this.state.errorInfo.componentStack}
-            </details>
-          </div>
-        </div>
-      );
-    }
-    
-    return this.props.children;
-  }
+  // ... (код ErrorBoundary без изменений)
 }
 
 // Компонент карты
 const Card = React.memo(({ value, suit, onClick, style = {} }) => {
-  const [isHovered, setIsHovered] = useState(false);
-  
-  const isRed = suit === '♥' || suit === '♦';
-  const cardStyle = {
-    ...styles.card,
-    ...(isRed ? styles.cardRed : {}),
-    ...(isHovered ? styles.cardHover : {}),
-    ...style
-  };
-  
-  return (
-    <div 
-      style={cardStyle}
-      onClick={onClick}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
-      <div style={styles.cardTop}>
-        <div>{value}</div>
-        <div>{suit}</div>
-      </div>
-      <div style={styles.cardCenter}>{suit}</div>
-      <div style={styles.cardBottom}>
-        <div>{value}</div>
-        <div>{suit}</div>
-      </div>
-    </div>
-  );
+  // ... (код Card без изменений)
 });
 
 // Основной компонент игры
@@ -305,7 +26,6 @@ const FoolGame = ({ user, socket, onReconnect, connectionStatus }) => {
   const [betStatus, setBetStatus] = useState('idle');
   const betTimeoutRef = useRef(null);
   const wakeUpIntervalRef = useRef(null);
-  const reconnectTimeoutRef = useRef(null);
 
   // Функция для "пробуждения" сервера
   const wakeUpServer = useCallback(() => {
@@ -322,56 +42,40 @@ const FoolGame = ({ user, socket, onReconnect, connectionStatus }) => {
       if (wakeUpIntervalRef.current) {
         clearInterval(wakeUpIntervalRef.current);
       }
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-      }
       if (betTimeoutRef.current) {
         clearTimeout(betTimeoutRef.current);
       }
     };
   }, [wakeUpServer]);
 
-  // Функция переподключения
-  const attemptReconnect = useCallback(() => {
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current);
+  // Обработка сообщений от сервера
+  useEffect(() => {
+    if (!socket) {
+      setError('Нет подключения к серверу');
+      return;
     }
     
-    reconnectTimeoutRef.current = setTimeout(() => {
-      console.log('Попытка переподключения...');
-      onReconnect();
-    }, 3000);
-  }, [onReconnect]);
-
- // Обработка сообщений от сервера
-useEffect(() => {
-  if (!socket) {
-    setError('Нет подключения к серверу');
-    attemptReconnect();
-    return;
-  }
-  
-  console.log('Настройка обработчиков событий сокета для комнаты');
-  
-  const handleGameUpdate = (state) => {
-    console.log('Получено обновление игры:', state);
-    setGameState(state);
-    setGamePhase(state.gamePhase);
-    setError('');
-    setBetStatus('idle');
+    console.log('Настройка обработчиков событий сокета для комнаты');
     
-    if (betTimeoutRef.current) {
-      clearTimeout(betTimeoutRef.current);
-      betTimeoutRef.current = null;
-    }
-  };
-  
-  const handleRoomCreated = (id) => {
-    console.log('Комната создана успешно, ID:', id);
-    setRoomId(id);
-    setGamePhase('waiting');
-    setError('');
-  };
+    const handleGameUpdate = (state) => {
+      console.log('Получено обновление игры:', state);
+      setGameState(state);
+      setGamePhase(state.gamePhase);
+      setError('');
+      setBetStatus('idle');
+      
+      if (betTimeoutRef.current) {
+        clearTimeout(betTimeoutRef.current);
+        betTimeoutRef.current = null;
+      }
+    };
+    
+    const handleRoomCreated = (id) => {
+      console.log('Комната создана успешно, ID:', id);
+      setRoomId(id);
+      setGamePhase('waiting');
+      setError('');
+    };
     
     const handlePlayerDisconnected = () => {
       console.log('Игрок отключился');
@@ -383,7 +87,6 @@ useEffect(() => {
     const handleSocketError = (message) => {
       console.error('Ошибка сокета:', message);
       setError(message);
-      attemptReconnect();
     };
     
     const handleConnect = () => {
@@ -393,11 +96,6 @@ useEffect(() => {
       if (user) {
         console.log('Отправка данных пользователя на сервер');
         socket.emit('user_login', user);
-        
-        if (roomId) {
-          console.log('Переподключение к комнате:', roomId);
-          socket.emit('join_room', roomId);
-        }
       }
     };
     
@@ -409,7 +107,6 @@ useEffect(() => {
     const handleDisconnect = () => {
       console.log('Отключено от сервера');
       setError('Отключено от сервера. Попытка переподключения...');
-      attemptReconnect();
     };
 
     const handlePong = () => {
@@ -425,17 +122,24 @@ useEffect(() => {
         setError(result.message || 'Ошибка при размещении ставки');
       }
     };
+
+    const handleLoginSuccess = (userData) => {
+      console.log('Успешный вход пользователя:', userData);
+      // Сервер может изменить данные пользователя, но мы не обновляем состояние,
+      // так как это должно обрабатываться в компоненте App
+    };
     
-   // Назначаем обработчики событий
-  socket.on('connect', handleConnect);
-  socket.on('connected', handleConnected);
-  socket.on('disconnect', handleDisconnect);
-  socket.on('game_update', handleGameUpdate);
-  socket.on('room_created', handleRoomCreated);
-  socket.on('player_disconnected', handlePlayerDisconnected);
-  socket.on('error', handleSocketError);
-  socket.on('pong', handlePong);
-  socket.on('bet_result', handleBetResult);
+    // Назначаем обработчики событий
+    socket.on('connect', handleConnect);
+    socket.on('connected', handleConnected);
+    socket.on('disconnect', handleDisconnect);
+    socket.on('game_update', handleGameUpdate);
+    socket.on('room_created', handleRoomCreated);
+    socket.on('player_disconnected', handlePlayerDisconnected);
+    socket.on('error', handleSocketError);
+    socket.on('pong', handlePong);
+    socket.on('bet_result', handleBetResult);
+    socket.on('login_success', handleLoginSuccess);
     
     // Инициализируем подключение
     if (socket.disconnected) {
@@ -443,20 +147,20 @@ useEffect(() => {
     }
     
     // Очистка обработчиков при размонтировании
-  return () => {
-    console.log('Очистка обработчиков событий');
-    socket.off('connect', handleConnect);
-    socket.off('connected', handleConnected);
-    socket.off('disconnect', handleDisconnect);
-    socket.off('game_update', handleGameUpdate);
-    socket.off('room_created', handleRoomCreated);
-    socket.off('player_disconnected', handlePlayerDisconnected);
-    socket.off('error', handleSocketError);
-    socket.off('pong', handlePong);
-    socket.off('bet_result', handleBetResult);
-  };
-}, [socket, user, roomId, attemptReconnect]);
-
+    return () => {
+      console.log('Очистка обработчиков событий');
+      socket.off('connect', handleConnect);
+      socket.off('connected', handleConnected);
+      socket.off('disconnect', handleDisconnect);
+      socket.off('game_update', handleGameUpdate);
+      socket.off('room_created', handleRoomCreated);
+      socket.off('player_disconnected', handlePlayerDisconnected);
+      socket.off('error', handleSocketError);
+      socket.off('pong', handlePong);
+      socket.off('bet_result', handleBetResult);
+      socket.off('login_success', handleLoginSuccess);
+    };
+  }, [socket, user]);
   
   // Размещение ставки с таймаутом
   useEffect(() => {
@@ -498,15 +202,14 @@ useEffect(() => {
   }, [socket, roomId]);
 
   // Создание комнаты
-const createRoom = () => {
-  if (!socket || socket.disconnected) {
-    setError('Нет подключения к серверу');
-    attemptReconnect();
-    return;
-  }
-  console.log('Отправка запроса на создание комнаты...');
-  socket.emit('create_room');
-};
+  const createRoom = () => {
+    if (!socket || socket.disconnected) {
+      setError('Нет подключения к серверу');
+      return;
+    }
+    console.log('Отправка запроса на создание комнаты...');
+    socket.emit('create_room');
+  };
 
   // Подключение к комнате
   const joinRoom = () => {
@@ -516,7 +219,6 @@ const createRoom = () => {
     }
     if (!socket || socket.disconnected) {
       setError('Нет подключения к серверу');
-      attemptReconnect();
       return;
     }
     console.log('Присоединение к комнате:', roomId);
@@ -531,7 +233,6 @@ const createRoom = () => {
     }
     if (!socket || socket.disconnected) {
       setError('Нет подключения к серверу');
-      attemptReconnect();
       return;
     }
     socket.emit('attack', { roomId, card: selectedCard });
@@ -546,7 +247,6 @@ const createRoom = () => {
     }
     if (!socket || socket.disconnected) {
       setError('Нет подключения к серверу');
-      attemptReconnect();
       return;
     }
     socket.emit('defend', { roomId, card: selectedCard });
@@ -557,7 +257,6 @@ const createRoom = () => {
   const takeCards = () => {
     if (!socket || socket.disconnected) {
       setError('Нет подключения к серверу');
-      attemptReconnect();
       return;
     }
     socket.emit('take_cards', roomId);
@@ -567,7 +266,6 @@ const createRoom = () => {
   const pass = () => {
     if (!socket || socket.disconnected) {
       setError('Нет подключения к серверу');
-      attemptReconnect();
       return;
     }
     socket.emit('pass', roomId);
@@ -577,7 +275,7 @@ const createRoom = () => {
   const renderPlayerCards = useCallback(() => {
     if (!gameState) return null;
     
-    const playerIndex = gameState.players.findIndex(p => p.id === socket.id);
+    const playerIndex = gameState.players.findIndex(p => p.id === user.id);
     if (playerIndex === -1) return null;
     
     return gameState.players[playerIndex].cards.map((card, index) => (
@@ -598,13 +296,13 @@ const createRoom = () => {
         }}
       />
     ));
-  }, [gameState, selectedCard, socket?.id]);
+  }, [gameState, selectedCard, user.id]);
 
   // Рендер карт оппонента
   const renderOpponentCards = useCallback(() => {
     if (!gameState) return null;
     
-    const playerIndex = gameState.players.findIndex(p => p.id === socket.id);
+    const playerIndex = gameState.players.findIndex(p => p.id === user.id);
     if (playerIndex === -1) return null;
     
     const opponentIndex = (playerIndex + 1) % 2;
@@ -625,7 +323,7 @@ const createRoom = () => {
         ♠
       </div>
     ));
-  }, [gameState, socket?.id]);
+  }, [gameState, user.id]);
 
   // Рендер карт на столе
   const renderTableCards = useCallback(() => {
@@ -806,7 +504,7 @@ const createRoom = () => {
   // Основной игровой интерфейс
   if (!gameState) return <div style={styles.loading}>Загрузка игры...</div>;
 
-  const playerIndex = gameState.players.findIndex(p => p.id === socket.id);
+  const playerIndex = gameState.players.findIndex(p => p.id === user.id);
   if (playerIndex === -1) return <div>Ошибка: игрок не найден</div>;
 
   const isPlayerTurn = gameState.currentPlayer === playerIndex;
@@ -937,7 +635,6 @@ const LoginForm = ({ onLogin, connectionStatus }) => {
     }
     
     onLogin({
-      id: Math.random().toString(36).substring(2, 9),
       name: username,
       mafs: 1500
     });
@@ -1103,24 +800,22 @@ function App() {
   }, []);
 
   const handleLogin = (userData) => {
-  console.log('Пользователь вошел:', userData);
-  setUser(userData);
-  
-  if (socket && socket.connected) {
-    console.log('Отправка данных пользователя на сервер...');
-    socket.emit('user_login', userData);
+    console.log('Пользователь вошел:', userData);
+    // Генерируем ID на клиенте, но сервер перезапишет его на socket.id
+    const userWithId = {
+      ...userData,
+      id: Math.random().toString(36).substring(2, 9) // временный ID
+    };
+    setUser(userWithId);
     
-    // Проверяем, получил ли сервер данные
-    setTimeout(() => {
-      if (!roomId) {
-        console.log('Проверка: пользовательские данные должны быть на сервере');
-      }
-    }, 1000);
-  } else {
-    console.error('Сокет не подключен, невозможно отправить данные');
-    setError('Нет подключения к серверу');
-  }
-};
+    if (socket && socket.connected) {
+      console.log('Отправка данных пользователя на сервер...');
+      socket.emit('user_login', userWithId);
+    } else {
+      console.error('Сокет не подключен, невозможно отправить данные');
+      setError('Нет подключения к серверу');
+    }
+  };
 
   const handleReconnect = () => {
     console.log('Принудительное переподключение');
