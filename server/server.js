@@ -108,89 +108,91 @@ io.on('connection', (socket) => {
     socketId: socket.id,
     status: 'connected'
   });
-
-  // Также отправляем стандартное событие connect для совместимости
-  socket.emit('connect');
   
   // Обработка ping-запросов для поддержания активности
   socket.on('ping', (data) => {
     socket.emit('pong', { timestamp: Date.now(), original: data });
   });
   
- // Обработка входа пользователя
-socket.on('user_login', (userData) => {
-  try {
-    console.log('Получены данные пользователя:', userData);
-    
-    if (!userData || !userData.name) {
-      socket.emit('login_error', 'Имя пользователя обязательно');
-      return;
+  // Обработка входа пользователя
+  socket.on('user_login', (userData) => {
+    try {
+      console.log('Получены данные пользователя:', userData);
+      
+      if (!userData || !userData.name) {
+        socket.emit('login_error', { message: 'Имя пользователя обязательно' });
+        return;
+      }
+      
+      const user = {
+        id: socket.id,
+        name: userData.name,
+        mafs: userData.mafs || 1000
+      };
+      
+      users.set(socket.id, user);
+      console.log('Пользователь сохранен:', user);
+      
+      // Отправляем подтверждение с полными данными пользователя
+      socket.emit('login_success', { 
+        user: user,
+        message: 'Вход выполнен успешно'
+      });
+      
+      console.log('Отправлено подтверждение входа пользователю:', socket.id);
+    } catch (error) {
+      console.error('Ошибка при входе пользователя:', error);
+      socket.emit('login_error', { message: 'Внутренняя ошибка сервера' });
     }
-    
-    const user = {
-      id: socket.id,
-      name: userData.name,
-      mafs: userData.mafs || 1000
-    };
-    
-    users.set(socket.id, user);
-    console.log('Пользователь сохранен:', user);
-    
-    socket.emit('login_success', user);
-    console.log('Отправлено подтверждение входа пользователю:', socket.id);
-  } catch (error) {
-    console.error('Ошибка при входе пользователя:', error);
-    socket.emit('login_error', 'Внутренняя ошибка сервера');
-  }
-});
+  });
   
   // Создание новой комнаты
-socket.on('create_room', () => {
-  try {
-    const user = users.get(socket.id);
-    
-    if (!user) {
-      socket.emit('error', 'Сначала войдите в систему');
-      return;
+  socket.on('create_room', () => {
+    try {
+      const user = users.get(socket.id);
+      
+      if (!user) {
+        socket.emit('error', { message: 'Сначала войдите в систему' });
+        return;
+      }
+      
+      const roomId = Math.random().toString(36).substring(2, 8);
+      const deck = shuffleDeck(generateDeck());
+      const trumpCard = deck[0];
+      
+      const room = {
+        id: roomId,
+        players: [{
+          id: socket.id,
+          name: user.name,
+          mafs: user.mafs,
+          cards: deck.slice(1, 7),
+          isActive: true
+        }],
+        deck: deck.slice(13),
+        trumpCard,
+        table: [],
+        currentPlayer: 0,
+        betAmount: 100,
+        gameStarted: false,
+        gamePhase: 'waiting'
+      };
+      
+      rooms.set(roomId, room);
+      socket.join(roomId);
+      
+      // Отправляем ID комнаты только создателю
+      socket.emit('room_created', { roomId: roomId });
+      
+      // Отправляем обновление состояния комнаты
+      socket.emit('game_update', room);
+      
+      console.log('Комната создана:', roomId, 'Пользователь:', user.name);
+    } catch (error) {
+      console.error('Ошибка при создании комнаты:', error);
+      socket.emit('error', { message: 'Ошибка при создании комнаты' });
     }
-    
-    const roomId = Math.random().toString(36).substring(2, 8);
-    const deck = shuffleDeck(generateDeck());
-    const trumpCard = deck[0];
-    
-    const room = {
-      id: roomId,
-      players: [{
-        id: socket.id,
-        name: user.name,
-        mafs: user.mafs,
-        cards: deck.slice(1, 7),
-        isActive: true
-      }],
-      deck: deck.slice(13),
-      trumpCard,
-      table: [],
-      currentPlayer: 0,
-      betAmount: 100,
-      gameStarted: false,
-      gamePhase: 'waiting'
-    };
-    
-    rooms.set(roomId, room);
-    socket.join(roomId);
-    
-    // ОТПРАВЛЯЕМ ТОЛЬКО СОЗДАТЕЛЮ КОМНАТЫ
-    socket.emit('room_created', roomId);
-    
-    // Отправляем обновление состояния комнаты
-    socket.emit('game_update', room);
-    
-    console.log('Комната создана:', roomId, 'Пользователь:', user.name);
-  } catch (error) {
-    console.error('Ошибка при создании комнаты:', error);
-    socket.emit('error', 'Ошибка при создании комнаты');
-  }
-});
+  });
   
   // Подключение к комнате
   socket.on('join_room', (roomId) => {
@@ -199,17 +201,17 @@ socket.on('create_room', () => {
       const user = users.get(socket.id);
       
       if (!room) {
-        socket.emit('error', 'Комната не найдена');
+        socket.emit('error', { message: 'Комната не найдена' });
         return;
       }
       
       if (room.players.length >= 2) {
-        socket.emit('error', 'Комната заполнена');
+        socket.emit('error', { message: 'Комната заполнена' });
         return;
       }
       
       if (!user) {
-        socket.emit('error', 'Сначала войдите в систему');
+        socket.emit('error', { message: 'Сначала войдите в систему' });
         return;
       }
       
@@ -236,7 +238,7 @@ socket.on('create_room', () => {
       console.log('Пользователь присоединился к комнате:', roomId);
     } catch (error) {
       console.error('Ошибка при присоединении к комнате:', error);
-      socket.emit('error', 'Ошибка при присоединении к комнате');
+      socket.emit('error', { message: 'Ошибка при присоединении к комнате' });
     }
   });
   
@@ -247,13 +249,13 @@ socket.on('create_room', () => {
       const room = rooms.get(roomId);
       
       if (!room) {
-        socket.emit('error', 'Комната не найдена');
+        socket.emit('error', { message: 'Комната не найдена' });
         return;
       }
       
       const player = room.players.find(p => p.id === socket.id);
       if (!player) {
-        socket.emit('error', 'Игрок не найден в комнате');
+        socket.emit('error', { message: 'Игрок не найден в комнате' });
         return;
       }
       
@@ -290,18 +292,18 @@ socket.on('create_room', () => {
       const room = rooms.get(roomId);
       
       if (!room) {
-        socket.emit('error', 'Комната не найдена');
+        socket.emit('error', { message: 'Комната не найдена' });
         return;
       }
       
       if (room.gamePhase !== 'attacking') {
-        socket.emit('error', 'Сейчас не фаза атаки');
+        socket.emit('error', { message: 'Сейчас не фаза атаки' });
         return;
       }
       
       const playerIndex = room.players.findIndex(p => p.id === socket.id);
       if (playerIndex !== room.currentPlayer) {
-        socket.emit('error', 'Сейчас не ваш ход');
+        socket.emit('error', { message: 'Сейчас не ваш ход' });
         return;
       }
       
@@ -313,7 +315,7 @@ socket.on('create_room', () => {
       );
       
       if (cardIndex === -1) {
-        socket.emit('error', 'У вас нет этой карты');
+        socket.emit('error', { message: 'У вас нет этой карты' });
         return;
       }
       
@@ -336,7 +338,7 @@ socket.on('create_room', () => {
       console.log(`Игрок ${player.name} атаковал картой ${card.value}${card.suit}`);
     } catch (error) {
       console.error('Ошибка при атаке:', error);
-      socket.emit('error', 'Ошибка при атаке');
+      socket.emit('error', { message: 'Ошибка при атаке' });
     }
   });
   
@@ -347,12 +349,12 @@ socket.on('create_room', () => {
       const room = rooms.get(roomId);
       
       if (!room) {
-        socket.emit('error', 'Комната не найдена');
+        socket.emit('error', { message: 'Комната не найдена' });
         return;
       }
       
       if (room.gamePhase !== 'defending') {
-        socket.emit('error', 'Сейчас не фаза защиты');
+        socket.emit('error', { message: 'Сейчас не фаза защиты' });
         return;
       }
       
@@ -360,7 +362,7 @@ socket.on('create_room', () => {
       const defenderIndex = (room.currentPlayer + 1) % 2;
       
       if (playerIndex !== defenderIndex) {
-        socket.emit('error', 'Сейчас не ваша очередь защищаться');
+        socket.emit('error', { message: 'Сейчас не ваша очередь защищаться' });
         return;
       }
       
@@ -375,7 +377,7 @@ socket.on('create_room', () => {
       );
       
       if (!canBeat) {
-        socket.emit('error', 'Эта карта не может побить атакующую');
+        socket.emit('error', { message: 'Эта карта не может побить атакующую' });
         return;
       }
       
@@ -385,7 +387,7 @@ socket.on('create_room', () => {
       );
       
       if (cardIndex === -1) {
-        socket.emit('error', 'У вас нет этой карты');
+        socket.emit('error', { message: 'У вас нет этой карты' });
         return;
       }
       
@@ -420,7 +422,7 @@ socket.on('create_room', () => {
       console.log(`Игрок ${player.name} защитился картой ${card.value}${card.suit}`);
     } catch (error) {
       console.error('Ошибка при защите:', error);
-      socket.emit('error', 'Ошибка при защите');
+      socket.emit('error', { message: 'Ошибка при защите' });
     }
   });
   
@@ -430,12 +432,12 @@ socket.on('create_room', () => {
       const room = rooms.get(roomId);
       
       if (!room) {
-        socket.emit('error', 'Комната не найдена');
+        socket.emit('error', { message: 'Комната не найдена' });
         return;
       }
       
       if (room.gamePhase !== 'defending') {
-        socket.emit('error', 'Сейчас не фаза защиты');
+        socket.emit('error', { message: 'Сейчас не фаза защиты' });
         return;
       }
       
@@ -443,7 +445,7 @@ socket.on('create_room', () => {
       const defenderIndex = (room.currentPlayer + 1) % 2;
       
       if (playerIndex !== defenderIndex) {
-        socket.emit('error', 'Сейчас не ваша очередь защищаться');
+        socket.emit('error', { message: 'Сейчас не ваша очередь защищаться' });
         return;
       }
       
@@ -473,7 +475,7 @@ socket.on('create_room', () => {
       console.log(`Игрок ${defender.name} взял карты`);
     } catch (error) {
       console.error('Ошибка при взятии карт:', error);
-      socket.emit('error', 'Ошибка при взятии карт');
+      socket.emit('error', { message: 'Ошибка при взятии карт' });
     }
   });
   
@@ -483,18 +485,18 @@ socket.on('create_room', () => {
       const room = rooms.get(roomId);
       
       if (!room) {
-        socket.emit('error', 'Комната не найдена');
+        socket.emit('error', { message: 'Комната не найдена' });
         return;
       }
       
       if (room.gamePhase !== 'attacking') {
-        socket.emit('error', 'Сейчас не фаза атаки');
+        socket.emit('error', { message: 'Сейчас не фаза атаки' });
         return;
       }
       
       const playerIndex = room.players.findIndex(p => p.id === socket.id);
       if (playerIndex !== room.currentPlayer) {
-        socket.emit('error', 'Сейчас не ваш ход');
+        socket.emit('error', { message: 'Сейчас не ваш ход' });
         return;
       }
       
@@ -512,7 +514,7 @@ socket.on('create_room', () => {
       console.log(`Игрок ${room.players[playerIndex].name} пасует`);
     } catch (error) {
       console.error('Ошибка при пасе:', error);
-      socket.emit('error', 'Ошибка при пасе');
+      socket.emit('error', { message: 'Ошибка при пасе' });
     }
   });
   
@@ -523,12 +525,12 @@ socket.on('create_room', () => {
       const room = rooms.get(roomId);
       
       if (!room) {
-        socket.emit('error', 'Комната не найдена');
+        socket.emit('error', { message: 'Комната не найдена' });
         return;
       }
       
       if (room.gamePhase === 'betting') {
-        // Пропускаем фазу ставок и переходим к атаке
+        // Пропускаем фазу ставки и переходим к атаке
         room.gamePhase = 'attacking';
         room.currentPlayer = 0;
         
@@ -539,7 +541,7 @@ socket.on('create_room', () => {
       }
     } catch (error) {
       console.error('Ошибка при принудительном продолжении:', error);
-      socket.emit('error', 'Ошибка при продолжении игры');
+      socket.emit('error', { message: 'Ошибка при продолжении игры' });
     }
   });
   
