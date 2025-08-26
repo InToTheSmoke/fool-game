@@ -263,7 +263,7 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-// Компонент карты
+
 const Card = React.memo(({ value, suit, onClick, style = {} }) => {
   const [isHovered, setIsHovered] = useState(false);
   
@@ -303,6 +303,7 @@ const FoolGame = ({ user, socket, onReconnect, connectionStatus }) => {
   const [gamePhase, setGamePhase] = useState('lobby');
   const [error, setError] = useState('');
   const [betStatus, setBetStatus] = useState('idle');
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const betTimeoutRef = useRef(null);
   const wakeUpIntervalRef = useRef(null);
 
@@ -386,6 +387,7 @@ const FoolGame = ({ user, socket, onReconnect, connectionStatus }) => {
     const handleDisconnect = () => {
       console.log('Отключено от сервера');
       setError('Отключено от сервера. Попытка переподключения...');
+      setIsLoggedIn(false);
     };
 
     const handlePong = () => {
@@ -404,9 +406,16 @@ const FoolGame = ({ user, socket, onReconnect, connectionStatus }) => {
 
     const handleLoginSuccess = (userData) => {
       console.log('Успешный вход пользователя:', userData);
+      setIsLoggedIn(true);
     };
-    
-    // Назначаем обработчики событий
+
+    const handleLoginError = (errorMessage) => {
+      console.error('Ошибка входа:', errorMessage);
+      setError(errorMessage);
+      setIsLoggedIn(false);
+    };
+
+   // Назначаем обработчики событий
     socket.on('connect', handleConnect);
     socket.on('connected', handleConnected);
     socket.on('disconnect', handleDisconnect);
@@ -417,6 +426,7 @@ const FoolGame = ({ user, socket, onReconnect, connectionStatus }) => {
     socket.on('pong', handlePong);
     socket.on('bet_result', handleBetResult);
     socket.on('login_success', handleLoginSuccess);
+    socket.on('login_error', handleLoginError);
     
     // Инициализируем подключение
     if (socket.disconnected) {
@@ -436,6 +446,7 @@ const FoolGame = ({ user, socket, onReconnect, connectionStatus }) => {
       socket.off('pong', handlePong);
       socket.off('bet_result', handleBetResult);
       socket.off('login_success', handleLoginSuccess);
+      socket.off('login_error', handleLoginError);
     };
   }, [socket, user]);
   
@@ -484,6 +495,12 @@ const FoolGame = ({ user, socket, onReconnect, connectionStatus }) => {
       setError('Нет подключения к серверу');
       return;
     }
+
+    if (!isLoggedIn) {
+      setError('Сначала необходимо войти в систему');
+      return;
+    }
+
     console.log('Отправка запроса на создание комнаты...');
     socket.emit('create_room');
   };
@@ -498,6 +515,12 @@ const FoolGame = ({ user, socket, onReconnect, connectionStatus }) => {
       setError('Нет подключения к серверу');
       return;
     }
+
+    if (!isLoggedIn) {
+      setError('Сначала необходимо войти в систему');
+      return;
+    }
+
     console.log('Присоединение к комнате:', roomId);
     socket.emit('join_room', roomId);
   };
@@ -552,7 +575,7 @@ const FoolGame = ({ user, socket, onReconnect, connectionStatus }) => {
   const renderPlayerCards = useCallback(() => {
     if (!gameState) return null;
     
-    const playerIndex = gameState.players.findIndex(p => p.id === user.id);
+    const playerIndex = gameState.players.findIndex(p => p.id === socket.id);
     if (playerIndex === -1) return null;
     
     return gameState.players[playerIndex].cards.map((card, index) => (
@@ -573,13 +596,13 @@ const FoolGame = ({ user, socket, onReconnect, connectionStatus }) => {
         }}
       />
     ));
-  }, [gameState, selectedCard, user.id]);
+  }, [gameState, selectedCard, socket.id]);
 
   // Рендер карт оппонента
   const renderOpponentCards = useCallback(() => {
     if (!gameState) return null;
     
-    const playerIndex = gameState.players.findIndex(p => p.id === user.id);
+    const playerIndex = gameState.players.findIndex(p => p.id === socket.id);
     if (playerIndex === -1) return null;
     
     const opponentIndex = (playerIndex + 1) % 2;
@@ -600,7 +623,7 @@ const FoolGame = ({ user, socket, onReconnect, connectionStatus }) => {
         ♠
       </div>
     ));
-  }, [gameState, user.id]);
+  }, [gameState, socket.id]);
 
   // Рендер карт на столе
   const renderTableCards = useCallback(() => {
@@ -662,13 +685,15 @@ const FoolGame = ({ user, socket, onReconnect, connectionStatus }) => {
         </div>
         
         <div style={styles.lobby}>
+          {!isLoggedIn && <p>Ожидание подтверждения входа...</p>}
+          
           <button 
             style={{
               ...styles.button,
-              ...(connectionStatus !== 'connected' ? styles.buttonDisabled : {})
+              ...(connectionStatus !== 'connected' || !isLoggedIn ? styles.buttonDisabled : {})
             }}
             onClick={createRoom} 
-            disabled={connectionStatus !== 'connected'}
+            disabled={connectionStatus !== 'connected' || !isLoggedIn}
           >
             Создать комнату
           </button>
@@ -691,10 +716,10 @@ const FoolGame = ({ user, socket, onReconnect, connectionStatus }) => {
             <button 
               style={{
                 ...styles.button,
-                ...(connectionStatus !== 'connected' ? styles.buttonDisabled : {})
+                ...(connectionStatus !== 'connected' || !isLoggedIn ? styles.buttonDisabled : {})
               }}
               onClick={joinRoom} 
-              disabled={connectionStatus !== 'connected'}
+              disabled={connectionStatus !== 'connected' || !isLoggedIn}
             >
               Присоединиться
             </button>
@@ -781,7 +806,7 @@ const FoolGame = ({ user, socket, onReconnect, connectionStatus }) => {
   // Основной игровой интерфейс
   if (!gameState) return <div style={styles.loading}>Загрузка игры...</div>;
 
-  const playerIndex = gameState.players.findIndex(p => p.id === user.id);
+  const playerIndex = gameState.players.findIndex(p => p.id === socket.id);
   if (playerIndex === -1) return <div>Ошибка: игрок не найден</div>;
 
   const isPlayerTurn = gameState.currentPlayer === playerIndex;
@@ -1084,18 +1109,13 @@ function App() {
 
   const handleLogin = (userData) => {
     console.log('Пользователь вошел:', userData);
-    // Генерируем ID на клиенте, но сервер перезапишет его на socket.id
-    const userWithId = {
-      ...userData,
-      id: Math.random().toString(36).substring(2, 9) // временный ID
-    };
-    setUser(userWithId);
+    setUser(userData);
     
     if (socket && socket.connected) {
       console.log('Отправка данных пользователя на сервер...');
-      socket.emit('user_login', userWithId);
+      socket.emit('user_login', userData);
     } else {
-      console.error('Сокет не подключен, невозможно отправить данных');
+      console.error('Сокет не подключен, невозможно отправить данные');
       setError('Нет подключения к серверу');
     }
   };
