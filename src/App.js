@@ -306,7 +306,9 @@ const FoolGame = ({ user, socket, onReconnect, connectionStatus }) => {
   const betTimeoutRef = useRef(null);
   const wakeUpIntervalRef = useRef(null);
   const loginTimeoutRef = useRef(null);
-
+  const [roomsList, setRoomsList] = useState([]);
+  const [roomName, setRoomName] = useState('');
+  
   // Функция для "пробуждения" сервера
   const wakeUpServer = useCallback(() => {
     if (socket && socket.connected) {
@@ -337,6 +339,22 @@ const FoolGame = ({ user, socket, onReconnect, connectionStatus }) => {
       setError('Нет подключения к серверу');
       return;
     }
+    useEffect(() => {
+  if (socket && gamePhase === 'lobby' && isLoggedIn) {
+    // Запрашиваем список комнат сразу при входе в лобби
+    socket.emit('get_rooms');
+    
+    // Устанавливаем интервал для периодического обновления
+    const roomsInterval = setInterval(() => {
+      if (socket.connected) {
+        socket.emit('get_rooms');
+      }
+    }, 3000);
+    
+    // Очистка интервала при размонтировании компонента или изменении условий
+    return () => clearInterval(roomsInterval);
+  }
+}, [socket, gamePhase, isLoggedIn]);
     
     console.log('Настройка обработчиков событий сокета для комнаты');
     
@@ -352,8 +370,13 @@ const FoolGame = ({ user, socket, onReconnect, connectionStatus }) => {
     betTimeoutRef.current = null;
   }
 };
-    
-const handleRoomCreated = (data) => {
+
+  const handleRoomsList = (rooms) => {
+  console.log('Получен список комнат:', rooms);
+  setRoomsList(rooms);
+};   
+
+  const handleRoomCreated = (data) => {
   console.log('Комната создана успешно, ID:', data.roomId);
   setRoomId(data.roomId);
   setGamePhase('waiting');
@@ -379,6 +402,10 @@ const handleSocketError = (data) => {
       if (user) {
         console.log('Отправка данных пользователя на сервер');
         socket.emit('user_login', user);
+        
+      if (socket && socket.connected) {
+      socket.emit('get_rooms');
+      }
         
         // Таймаут для ожидания подтверждения входа
         loginTimeoutRef.current = setTimeout(() => {
@@ -447,7 +474,7 @@ const handleLoginError = (data) => {
     socket.on('bet_result', handleBetResult);
     socket.on('login_success', handleLoginSuccess);
     socket.on('login_error', handleLoginError);
-    
+    socket.on('rooms_list', handleRoomsList);
     // Инициализируем подключение
     if (socket.disconnected) {
       socket.connect();
@@ -467,6 +494,7 @@ const handleLoginError = (data) => {
       socket.off('bet_result', handleBetResult);
       socket.off('login_success', handleLoginSuccess);
       socket.off('login_error', handleLoginError);
+      socket.off('rooms_list', handleRoomsList);
     };
   }, [socket, user, isLoggedIn]);
   
@@ -510,15 +538,20 @@ const handleLoginError = (data) => {
   }, [socket, roomId]);
 
   // Создание комнаты
-  const createRoom = () => {
-    if (!socket || socket.disconnected) {
-      setError('Нет подключения к серверу');
-      return;
-    }
+const createRoom = () => {
+  if (!socket || socket.disconnected) {
+    setError('Нет подключения к серверу');
+    return;
+  }
 
-    console.log('Отправка запроса на создание комнаты...');
-    socket.emit('create_room');
-  };
+  if (!isLoggedIn) {
+    setError('Сначала необходимо войти в систему');
+    return;
+  }
+
+  console.log('Отправка запроса на создание комнаты...');
+  socket.emit('create_room', { roomName: roomName || `Комната ${Date.now()}` });
+};
 
   // Подключение к комнате
   const joinRoom = () => {
@@ -683,34 +716,36 @@ const handleLoginError = (data) => {
     );
   }
 
-  // Лобби игры
-  if (gamePhase === 'lobby') {
-    return (
-      <div style={styles.container}>
-        <div style={styles.header}>
-          <h1 style={styles.title}>Дурак онлайн</h1>
-          <p>Играйте с реальными соперниками</p>
-          {connectionStatus === 'connecting' && <p>Подключение к серверу...</p>}
-          {error && <p style={styles.error}>{error}</p>}
-        </div>
+ // Лобби игры
+if (gamePhase === 'lobby') {
+  return (
+    <div style={styles.container}>
+      <div style={styles.header}>
+        <h1 style={styles.title}>Дурак онлайн</h1>
+        <p>Играйте с реальными соперниками</p>
+        {connectionStatus === 'connecting' && <p>Подключение к серверу...</p>}
+        {error && <p style={styles.error}>{error}</p>}
+      </div>
+      
+      <div style={styles.lobby}>
+        {!isLoggedIn && <p>Ожидание подтверждения входа...</p>}
         
-        <div style={styles.lobby}>
-          {!isLoggedIn && (
-            <div style={styles.loading}>
-              <p>Ожидание подтверждения входа...</p>
-              <button 
-                style={styles.reconnectButton}
-                onClick={() => {
-                  if (socket && user) {
-                    socket.emit('user_login', user);
-                  }
-                }}
-              >
-                Повторить вход
-              </button>
-            </div>
-          )}
-          
+        <div style={{ marginBottom: '20px' }}>
+          <h3>Создать комнату:</h3>
+          <input
+            type="text"
+            placeholder="Название комнаты"
+            value={roomName}
+            onChange={(e) => setRoomName(e.target.value)}
+            style={{
+              padding: '10px',
+              borderRadius: '5px',
+              border: 'none',
+              fontSize: '16px',
+              marginRight: '10px',
+              width: '200px'
+            }}
+          />
           <button 
             style={{
               ...styles.button,
@@ -721,37 +756,75 @@ const handleLoginError = (data) => {
           >
             Создать комнату
           </button>
-          
-          <div style={{ margin: '20px 0' }}>
-            <h3>Или присоединиться к комнате:</h3>
-            <input
-              type="text"
-              placeholder="ID комнаты"
-              value={roomId}
-              onChange={(e) => setRoomId(e.target.value)}
-              style={{
-                padding: '10px',
-                borderRadius: '5px',
-                border: 'none',
-                fontSize: '16px',
-                marginRight: '10px'
-              }}
-            />
-            <button 
-              style={{
-                ...styles.button,
-                ...(connectionStatus !== 'connected' || !isLoggedIn ? styles.buttonDisabled : {})
-              }}
-              onClick={joinRoom} 
-              disabled={connectionStatus !== 'connected' || !isLoggedIn}
-            >
-              Присоединиться
-            </button>
-          </div>
+        </div>
+        
+        <div style={{ margin: '20px 0' }}>
+          <h3>Доступные комнаты:</h3>
+          {roomsList.length === 0 ? (
+            <p>Нет доступных комнат</p>
+          ) : (
+            <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+              {roomsList.map(room => (
+                <div key={room.id} style={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                  padding: '10px',
+                  margin: '5px 0',
+                  borderRadius: '5px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <div>
+                    <div style={{ fontWeight: 'bold' }}>{room.name}</div>
+                    <div>Игроков: {room.players}/{room.maxPlayers}</div>
+                    <div>Статус: {room.gameStarted ? 'Игра началась' : 'Ожидание'}</div>
+                  </div>
+                  <button 
+                    style={styles.button}
+                    onClick={() => {
+                      setRoomId(room.id);
+                      joinRoom();
+                    }}
+                    disabled={room.players >= room.maxPlayers || room.gameStarted}
+                  >
+                    Присоединиться
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        
+        <div style={{ margin: '20px 0' }}>
+          <h3>Или присоединиться по ID:</h3>
+          <input
+            type="text"
+            placeholder="ID комнаты"
+            value={roomId}
+            onChange={(e) => setRoomId(e.target.value)}
+            style={{
+              padding: '10px',
+              borderRadius: '5px',
+              border: 'none',
+              fontSize: '16px',
+              marginRight: '10px'
+            }}
+          />
+          <button 
+            style={{
+              ...styles.button,
+              ...(connectionStatus !== 'connected' || !isLoggedIn ? styles.buttonDisabled : {})
+            }}
+            onClick={joinRoom} 
+            disabled={connectionStatus !== 'connected' || !isLoggedIn}
+          >
+            Присоединиться
+          </button>
         </div>
       </div>
-    );
-  }
+    </div>
+  );
+}
 
   // Ожидание второго игрока
   if (gamePhase === 'waiting') {
