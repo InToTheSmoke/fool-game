@@ -1223,7 +1223,8 @@ newSocket.on('error', (errorData) => {
       setError('Нет подключения к серверу');
     }
   };
-
+  
+  
   const handleReconnect = () => {
     console.log('Принудительное переподключение');
     setConnectionStatus('connecting');
