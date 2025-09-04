@@ -406,7 +406,7 @@ io.on('connection', (socket) => {
     }
   });
   
- // Защита
+// Защита
 socket.on('defend', (data) => {
   try {
     const { roomId, card } = data;
@@ -474,8 +474,8 @@ socket.on('defend', (data) => {
       room.table = [];
       room.gamePhase = 'attacking';
       
-      // Ход переходит к следующему игроку (бывшему защищающемуся)
-      room.currentPlayer = (room.currentPlayer + 1) % room.players.length;
+      // Ход переходит к защищавшемуся игроку (текущему игроку)
+      // Не меняем room.currentPlayer, так как защищавшийся становится атакующим
       
       // Добираем карты
       room.players.forEach(player => {
