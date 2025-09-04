@@ -338,7 +338,7 @@ const FoolGame = ({ user, socket, onReconnect, connectionStatus }) => {
     if (!socket) {
       setError('Нет подключения к серверу');
       return;
-    }[socket, user]);
+    }, [socket, user]);
       useEffect(() => {
   if (socket && gamePhase === 'lobby' && isLoggedIn) {
     // Запрашиваем список комнат сразу при входе в лобби
