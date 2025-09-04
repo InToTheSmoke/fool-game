@@ -338,8 +338,8 @@ const FoolGame = ({ user, socket, onReconnect, connectionStatus }) => {
     if (!socket) {
       setError('Нет подключения к серверу');
       return;
-    }
-    useEffect(() => {
+    }[socket, user]);
+      useEffect(() => {
   if (socket && gamePhase === 'lobby' && isLoggedIn) {
     // Запрашиваем список комнат сразу при входе в лобби
     socket.emit('get_rooms');
@@ -356,7 +356,7 @@ const FoolGame = ({ user, socket, onReconnect, connectionStatus }) => {
   }
 }, [socket, gamePhase, isLoggedIn]);
     
-    console.log('Настройка обработчиков событий сокета для комнаты');
+  console.log('Настройка обработчиков событий сокета для комнаты');
     
   const handleGameUpdate = (state) => {
   console.log('Получено обновление игры:', state);
