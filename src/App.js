@@ -632,7 +632,16 @@ const FoolGame = ({ user, socket, onReconnect, connectionStatus }) => {
     }
     socket.emit('pass', roomId);
   };
-
+  
+  // бито
+  const bito = () => {
+  if (!socket || socket.disconnected) {
+    setError('Нет подключения к серверу');
+    return;
+  }
+  socket.emit('bito', roomId);
+};
+  
   // Рендер карт игрока
   const renderPlayerCards = useCallback(() => {
   if (!gameState) return null;
@@ -1047,27 +1056,23 @@ const FoolGame = ({ user, socket, onReconnect, connectionStatus }) => {
   <button 
     style={{
       ...styles.button,
-      ...(!(gameState.gamePhase === 'attacking' && isPlayerTurn && gameState.table.length === 0) ? styles.buttonDisabled : {})
+      ...(!(gameState.gamePhase === 'defending' && !isDefenderTurn && gameState.table.length > 0) ? styles.buttonDisabled : {})
     }}
-    onClick={pass}
-    disabled={!(gameState.gamePhase === 'attacking' && isPlayerTurn && gameState.table.length === 0)}
+    onClick={bito}
+    disabled={!(gameState.gamePhase === 'defending' && !isDefenderTurn && gameState.table.length > 0)}
   >
-    Пас
+    Бито
   </button>
 </div>
-        
-        {/* Сообщения игры */}
-       <div style={styles.message}>
+
+// Обновляем сообщения игры:
+<div style={styles.message}>
   {gameState.gamePhase === 'attacking' && isPlayerTurn && 'Ваш ход. Выберите карту для атаки'}
   {gameState.gamePhase === 'attacking' && !isPlayerTurn && 'Ожидание хода соперника...'}
   {gameState.gamePhase === 'defending' && isPlayerTurn && 'Ваша очередь защищаться'}
-  {gameState.gamePhase === 'defending' && !isPlayerTurn && gameState.table.length > 0 && 'Вы можете подкинуть карты того же достоинства'}
+  {gameState.gamePhase === 'defending' && !isPlayerTurn && gameState.table.length > 0 && 'Вы можете подкинуть карты или завершить раунд'}
   {gameState.gamePhase === 'defending' && !isPlayerTurn && gameState.table.length === 0 && 'Соперник защищается...'}
 </div>
-      </div>
-    </div>
-  );
-};
 
 // Компонент аутентификации
 const LoginForm = ({ onLogin, connectionStatus }) => {
