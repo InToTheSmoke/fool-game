@@ -34,7 +34,6 @@ const styles = {
   playerPanel: {
     flex: 1,
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
-
     borderRadius: '15px',
     padding: '20px',
     boxShadow: '0 5px 15px rgba(0, 0, 0, 0.2)'
@@ -286,7 +285,7 @@ const Card = React.memo(({ value, suit, onClick, style = {} }) => {
   const cardStyle = {
     ...styles.card,
     ...(isRed ? styles.cardRed : {}),
-    ...(isHovered ? styles.cardHover : {}),
+    ...(isHovered ? { ...styles.cardHover, transform: 'translateY(-5px)' } : {}),
     ...style
   };
   
@@ -528,7 +527,7 @@ const FoolGame = ({ user, socket, onReconnect, connectionStatus }) => {
         
         setTimeout(() => {
           if (gamePhase === 'betting') {
-            console.log('Принудительный переход от фазы ставок');
+            console.log('Принудительный переход от фазы ставки');
             socket.emit('force_continue', { roomId });
           }
         }, 1000);
@@ -552,7 +551,7 @@ const FoolGame = ({ user, socket, onReconnect, connectionStatus }) => {
     }
   }, [socket, roomId]);
 
-  // Создание комнаты
+  // Создание комната
   const createRoom = () => {
     if (!socket || socket.disconnected) {
       setError('Нет подключения к серверу');
@@ -1212,7 +1211,10 @@ function App() {
       console.log('Закрыто предыдущее соединение');
     }
 
-    const serverUrl = process.env.REACT_APP_SERVER_URL || 'https://fool-game-bte4.onrender.com';
+    const serverUrl = process.env.NODE_ENV === 'production' 
+      ? 'https://fool-game-bte4.onrender.com' 
+      : 'http://localhost:5000';
+    
     console.log('Создание нового подключения к серверу:', serverUrl);
     
     const newSocket = io(serverUrl, {
