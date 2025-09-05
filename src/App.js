@@ -34,6 +34,7 @@ const styles = {
   playerPanel: {
     flex: 1,
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
+
     borderRadius: '15px',
     padding: '20px',
     boxShadow: '0 5px 15px rgba(0, 0, 0, 0.2)'
@@ -632,61 +633,61 @@ const FoolGame = ({ user, socket, onReconnect, connectionStatus }) => {
     }
     socket.emit('pass', roomId);
   };
-  
-  // бито
+
+  // Завершение раунда (Бито)
   const bito = () => {
-  if (!socket || socket.disconnected) {
-    setError('Нет подключения к серверу');
-    return;
-  }
-  socket.emit('bito', roomId);
-};
-  
+    if (!socket || socket.disconnected) {
+      setError('Нет подключения к серверу');
+      return;
+    }
+    socket.emit('bito', roomId);
+  };
+
   // Рендер карт игрока
   const renderPlayerCards = useCallback(() => {
-  if (!gameState) return null;
-  
-  const playerIndex = gameState.players.findIndex(p => p.id === socket.id);
-  if (playerIndex === -1) return null;
-  
-  const isAttacker = gameState.gamePhase === 'defending' && 
-                    gameState.currentPlayer !== playerIndex;
-  
-  return gameState.players[playerIndex].cards.map((card, index) => (
-    <Card
-      key={`${card.value}-${card.suit}-${index}`}
-      value={card.value}
-      suit={card.suit}
-      onClick={() => {
-        // Если фаза атаки и ход игрока
-        if (gameState.gamePhase === 'attacking' && gameState.currentPlayer === playerIndex) {
-          setSelectedCard(card);
-        } 
-        // Если фаза защиты и ход игрока
-        else if (gameState.gamePhase === 'defending' && gameState.currentPlayer === playerIndex) {
-          setSelectedCard(card);
-        }
-        // Если фаза защиты и игрок может подкидывать (не защищающийся)
-        else if (isAttacker) {
-          // Проверяем, можно ли подкинуть эту карту
-          const canAddToAttack = gameState.table.some(item => 
-            item.card.value === card.value
-          );
-          
-          if (canAddToAttack) {
+    if (!gameState) return null;
+    
+    const playerIndex = gameState.players.findIndex(p => p.id === socket.id);
+    if (playerIndex === -1) return null;
+    
+    const isAttacker = gameState.gamePhase === 'defending' && 
+                      gameState.currentPlayer !== playerIndex;
+    
+    return gameState.players[playerIndex].cards.map((card, index) => (
+      <Card
+        key={`${card.value}-${card.suit}-${index}`}
+        value={card.value}
+        suit={card.suit}
+        onClick={() => {
+          // Если фаза атаки и ход игрока
+          if (gameState.gamePhase === 'attacking' && gameState.currentPlayer === playerIndex) {
             setSelectedCard(card);
-          } else {
-            setError('Можно подкидывать только карты того же достоинства, что уже есть на столе');
+          } 
+          // Если фаза защиты и ход игрока
+          else if (gameState.gamePhase === 'defending' && gameState.currentPlayer === playerIndex) {
+            setSelectedCard(card);
           }
-        }
-      }}
-      style={{
-        opacity: selectedCard && selectedCard.value === card.value && selectedCard.suit === card.suit ? 0.7 : 1,
-        border: selectedCard && selectedCard.value === card.value && selectedCard.suit === card.suit ? '2px solid yellow' : 'none'
-      }}
-    />
-  ));
-}, [gameState, selectedCard, socket.id]);
+          // Если фаза защиты и игрок может подкидывать (не защищающийся)
+          else if (isAttacker) {
+            // Проверяем, можно ли подкинуть эту карту
+            const canAddToAttack = gameState.table.some(item => 
+              item.card.value === card.value
+            );
+            
+            if (canAddToAttack) {
+              setSelectedCard(card);
+            } else {
+              setError('Можно подкидывать только карты того же достоинства, что уже есть на столе');
+            }
+          }
+        }}
+        style={{
+          opacity: selectedCard && selectedCard.value === card.value && selectedCard.suit === card.suit ? 0.7 : 1,
+          border: selectedCard && selectedCard.value === card.value && selectedCard.suit === card.suit ? '2px solid yellow' : 'none'
+        }}
+      />
+    ));
+  }, [gameState, selectedCard, socket.id]);
 
   // Рендер карт оппонента
   const renderOpponentCards = useCallback(() => {
@@ -965,6 +966,7 @@ const FoolGame = ({ user, socket, onReconnect, connectionStatus }) => {
   const isPlayerTurn = gameState.currentPlayer === playerIndex;
   const opponentIndex = (playerIndex + 1) % 2;
   const isDefenderTurn = gameState.gamePhase === 'defending' && isPlayerTurn;
+  const isAttackerTurn = gameState.gamePhase === 'defending' && !isPlayerTurn;
 
   return (
     <div style={styles.container}>
@@ -1017,62 +1019,66 @@ const FoolGame = ({ user, socket, onReconnect, connectionStatus }) => {
         
         {/* Элементы управления */}
         <div style={styles.controls}>
-  <button 
-    style={{
-      ...styles.button,
-      ...(!(
-        (gameState.gamePhase === 'attacking' && isPlayerTurn) || 
-        (gameState.gamePhase === 'defending' && !isDefenderTurn && gameState.table.length > 0)
-      ) ? styles.buttonDisabled : {})
-    }}
-    onClick={attack}
-    disabled={!(
-      (gameState.gamePhase === 'attacking' && isPlayerTurn) || 
-      (gameState.gamePhase === 'defending' && !isDefenderTurn && gameState.table.length > 0)
-    )}
-  >
-    {gameState.gamePhase === 'defending' && !isDefenderTurn ? 'Подкинуть' : 'Атаковать'}
-  </button>
-  <button 
-    style={{
-      ...styles.button,
-      ...(!(gameState.gamePhase === 'defending' && isDefenderTurn) ? styles.buttonDisabled : {})
-    }}
-    onClick={defend}
-    disabled={!(gameState.gamePhase === 'defending' && isDefenderTurn)}
-  >
-    Защищаться
-  </button>
-  <button 
-    style={{
-      ...styles.button,
-      ...(!(gameState.gamePhase === 'defending' && isDefenderTurn) ? styles.buttonDisabled : {})
-    }}
-    onClick={takeCards}
-    disabled={!(gameState.gamePhase === 'defending' && isDefenderTurn)}
-  >
-    Взять
-  </button>
-  <button 
-    style={{
-      ...styles.button,
-      ...(!(gameState.gamePhase === 'defending' && !isDefenderTurn && gameState.table.length > 0) ? styles.buttonDisabled : {})
-    }}
-    onClick={bito}
-    disabled={!(gameState.gamePhase === 'defending' && !isDefenderTurn && gameState.table.length > 0)}
-  >
-    Бито
-  </button>
-</div>
-
-// Обновляем сообщения игры:
-<div style={styles.message}>
-  {gameState.gamePhase === 'attacking' && isPlayerTurn && 'Ваш ход. Выберите карту для атаки'}
-  {gameState.gamePhase === 'attacking' && !isPlayerTurn && 'Ожидание хода соперника...'}
-  {gameState.gamePhase === 'defending' && isPlayerTurn && 'Ваша очередь защищаться'}
-  {gameState.gamePhase === 'defending' && !isPlayerTurn && gameState.table.length > 0 && 'Вы можете подкинуть карты или завершить раунд'}
-  {gameState.gamePhase === 'defending' && !isPlayerTurn && gameState.table.length === 0 && 'Соперник защищается...'}
-</div>
+          <button 
+            style={{
+              ...styles.button,
+              ...(!(
+                (gameState.gamePhase === 'attacking' && isPlayerTurn) || 
+                (isAttackerTurn && gameState.table.length > 0)
+              ) ? styles.buttonDisabled : {})
+            }}
+            onClick={attack}
+            disabled={!(
+              (gameState.gamePhase === 'attacking' && isPlayerTurn) || 
+              (isAttackerTurn && gameState.table.length > 0)
+            )}
+          >
+            {isAttackerTurn ? 'Подкинуть' : 'Атаковать'}
+          </button>
+          <button 
+            style={{
+              ...styles.button,
+              ...(!(isDefenderTurn) ? styles.buttonDisabled : {})
+            }}
+            onClick={defend}
+            disabled={!isDefenderTurn}
+          >
+            Защищаться
+          </button>
+          <button 
+            style={{
+              ...styles.button,
+              ...(!(isDefenderTurn) ? styles.buttonDisabled : {})
+            }}
+            onClick={takeCards}
+            disabled={!isDefenderTurn}
+          >
+            Взять
+          </button>
+          <button 
+            style={{
+              ...styles.button,
+              ...(!(isAttackerTurn && gameState.table.length > 0) ? styles.buttonDisabled : {})
+            }}
+            onClick={bito}
+            disabled={!(isAttackerTurn && gameState.table.length > 0)}
+          >
+            Бито
+          </button>
+        </div>
+        
+        {/* Сообщения игры */}
+        <div style={styles.message}>
+          {gameState.gamePhase === 'attacking' && isPlayerTurn && 'Ваш ход. Выберите карту для атаки'}
+          {gameState.gamePhase === 'attacking' && !isPlayerTurn && 'Ожидание хода соперника...'}
+          {isDefenderTurn && 'Ваша очередь защищаться'}
+          {isAttackerTurn && gameState.table.length > 0 && 'Вы можете подкинуть карты или завершить раунд'}
+          {isAttackerTurn && gameState.table.length === 0 && 'Соперник защищается...'}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // Компонент аутентификации
 const LoginForm = ({ onLogin, connectionStatus }) => {
