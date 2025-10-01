@@ -2,13 +2,310 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import io from 'socket.io-client';
 
 // Стилизация компонентов (остаются без изменений, как в вашем исходном коде)
-const styles = { ... };
+const styles = {
+  container: {
+    fontFamily: '"Arial", sans-serif',
+    maxWidth: '1200px',
+    margin: '0 auto',
+    padding: '20px',
+    backgroundColor: '#1a5f7a',
+    minHeight: '100vh',
+    color: '#fff'
+  },
+  header: {
+    textAlign: 'center',
+    marginBottom: '30px'
+  },
+  title: {
+    fontSize: '36px',
+    marginBottom: '10px',
+    textShadow: '2px 2px 4px rgba(0, 0, 0, 0.5)'
+  },
+  gameArea: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '20px'
+  },
+  playersContainer: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    gap: '20px'
+  },
+  playerPanel: {
+    flex: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: '15px',
+    padding: '20px',
+    boxShadow: '0 5px 15px rgba(0, 0, 0, 0.2)'
+  },
+  playerHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '15px'
+  },
+  playerName: {
+    fontSize: '24px',
+    color: '#ffcc00'
+  },
+  playerStats: {
+    display: 'flex',
+    gap: '15px'
+  },
+  stat: {
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    padding: '8px 15px',
+    borderRadius: '10px'
+  },
+  cardsContainer: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '10px',
+    minHeight: '150px',
+    justifyContent: 'center'
+  },
+  table: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: '15px',
+    padding: '20px',
+    minHeight: '200px',
+    boxShadow: 'inset 0 0 10px rgba(0, 0, 0, 0.2)'
+  },
+  tableTitle: {
+    textAlign: 'center',
+    marginBottom: '15px',
+    fontSize: '20px'
+  },
+  tableCards: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '10px',
+    justifyContent: 'center',
+    minHeight: '150px'
+  },
+  controls: {
+    display: 'flex',
+    justifyContent: 'center',
+    gap: '15px',
+    flexWrap: 'wrap'
+  },
+  button: {
+    padding: '12px 25px',
+    border: 'none',
+    borderRadius: '10px',
+    background: 'linear-gradient(to right, #ffcc00, #ff9900)',
+    color: '#000',
+    fontWeight: 'bold',
+    fontSize: '16px',
+    cursor: 'pointer',
+    transition: 'all 0.3s',
+    boxShadow: '0 5px 15px rgba(0, 0, 0, 0.2)'
+  },
+  buttonHover: {
+    transform: 'translateY(-3px)',
+    boxShadow: '0 8px 20px rgba(0, 0, 0, 0.3)'
+  },
+  buttonDisabled: {
+    background: '#666',
+    cursor: 'not-allowed'
+  },
+  bettingPanel: {
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: '15px',
+    padding: '20px',
+    textAlign: 'center'
+  },
+  bettingTitle: {
+    marginBottom: '15px',
+    color: '#ffcc00'
+  },
+  betControls: {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: '15px',
+    flexWrap: 'wrap'
+  },
+  betAmount: {
+    fontSize: '20px',
+    fontWeight: 'bold',
+    minWidth: '100px'
+  },
+  message: {
+    textAlign: 'center',
+    fontSize: '20px',
+    marginTop: '20px',
+    padding: '15px',
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    borderRadius: '10px',
+    color: '#ffcc00'
+  },
+  card: {
+    width: '70px',
+    height: '100px',
+    backgroundColor: '#fff',
+    borderRadius: '8px',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'space-between',
+    padding: '5px',
+    color: '#000',
+    fontWeight: 'bold',
+    boxShadow: '0 3px 6px rgba(0, 0, 0, 0.3)',
+    cursor: 'pointer',
+    transition: 'transform 0.2s'
+  },
+  cardHover: {
+    transform: 'translateY(-5px)'
+  },
+  cardRed: {
+    color: '#e00'
+  },
+  cardTop: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    fontSize: '16px'
+  },
+  cardBottom: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+    transform: 'rotate(180deg)',
+    fontSize: '16px'
+  },
+  cardCenter: {
+    alignSelf: 'center',
+    fontSize: '24px'
+  },
+  lobby: {
+    textAlign: 'center',
+    padding: '20px'
+  },
+  roomId: {
+    fontSize: '24px',
+    margin: '20px 0',
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    padding: '10px',
+    borderRadius: '10px',
+    display: 'inline-block'
+  },
+  error: {
+    color: '#ff6b6b',
+    textAlign: 'center',
+    padding: '10px',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    borderRadius: '5px',
+    margin: '10px 0'
+  },
+  connectionStatus: {
+    position: 'fixed',
+    top: '10px',
+    right: '10px',
+    padding: '5px 10px',
+    borderRadius: '5px',
+    fontSize: '12px',
+    zIndex: 1000
+  },
+  loading: {
+    textAlign: 'center',
+    fontSize: '20px',
+    padding: '20px'
+  },
+  reconnectButton: {
+    padding: '10px 20px',
+    border: 'none',
+    borderRadius: '5px',
+    background: '#ff9900',
+    color: '#000',
+    fontWeight: 'bold',
+    cursor: 'pointer',
+    margin: '10px'
+  },
+  roomList: {
+    maxHeight: '300px',
+    overflowY: 'auto',
+    margin: '20px 0'
+  },
+  roomItem: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    padding: '10px',
+    margin: '5px 0',
+    borderRadius: '5px',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center'
+  }
+ };
 
 // Error Boundary (остается без изменений)
-class ErrorBoundary extends React.Component { ... }
+class ErrorBoundary extends React.Component { 
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null, errorInfo: null };
+  }
+  
+  static getDerivedStateFromError(error) {
+    return { hasError: true };
+  }
+  
+  componentDidCatch(error, errorInfo) {
+    this.setState({
+      error: error,
+      errorInfo: errorInfo
+    });
+    console.error('Error caught by boundary:', error, errorInfo);
+  }
+  
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={styles.container}>
+          <div style={styles.error}>
+            <h2>Что-то пошло не так.</h2>
+            <details style={{ whiteSpace: 'pre-wrap', color: '#fff' }}>
+              {this.state.error && this.state.error.toString()}
+              <br />
+              {this.state.errorInfo.componentStack}
+            </details>
+          </div>
+        </div>
+      );
+    }
+    
+    return this.props.children;
+  } }
 
 // Компонент карты (остается без изменений)
-const Card = React.memo(({ value, suit, onClick, style = {} }) => { ... });
+const Card = React.memo(({ value, suit, onClick, style = {} }) => {
+  const [isHovered, setIsHovered] = useState(false);
+  
+  const isRed = suit === '♥' || suit === '♦';
+  const cardStyle = {
+    ...styles.card,
+    ...(isRed ? styles.cardRed : {}),
+    ...(isHovered ? { ...styles.cardHover, transform: 'translateY(-5px)' } : {}),
+    ...style
+  };
+  
+  return (
+    <div 
+      style={cardStyle}
+      onClick={onClick}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      <div style={styles.cardTop}>
+        <div>{value}</div>
+        <div>{suit}</div>
+      </div>
+      <div style={styles.cardCenter}>{suit}</div>
+      <div style={styles.cardBottom}>
+        <div>{value}</div>
+        <div>{suit}</div>
+      </div>
+    </div>
+  );});
 
 // Основной компонент игры
 const FoolGame = ({ user, socket, onReconnect, connectionStatus }) => {
