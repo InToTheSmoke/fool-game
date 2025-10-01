@@ -440,7 +440,115 @@ const FoolGame = ({ user, socket, onReconnect, connectionStatus }) => {
     const handlePong = () => {
       console.log('Сервер активен');
     };
-    
+    const renderDeckAndTrump = useCallback(() => {
+  if (!gameState || !gameState.trumpCard) return null;
+  
+  return (
+    <div style={{ 
+      marginTop: '20px', 
+      textAlign: 'center',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center'
+    }}>
+      <h3>Колода и козырь</h3>
+      <div style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        gap: '10px',
+        marginTop: '10px'
+      }}>
+        {/* Колода */}
+        <div style={{ 
+          position: 'relative',
+          width: '70px',
+          height: '100px'
+        }}>
+          {/* Основная колода - стопка карт */}
+          {gameState.deck.length > 0 && (
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '70px',
+              height: '100px',
+              backgroundColor: '#fff',
+              borderRadius: '8px',
+              background: 'linear-gradient(45deg, #d40000, #1c8c68)',
+              boxShadow: '0 3px 6px rgba(0, 0, 0, 0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#fff',
+              fontSize: '24px',
+              fontWeight: 'bold'
+            }}>
+              {gameState.deck.length}
+            </div>
+          )}
+          
+          {/* Верхние карты колоды для эффекта стопки */}
+          {gameState.deck.length > 1 && (
+            <div style={{
+              position: 'absolute',
+              top: 2,
+              left: 2,
+              width: '66px',
+              height: '96px',
+              backgroundColor: '#fff',
+              borderRadius: '6px',
+              background: 'linear-gradient(45deg, #d40000, #1c8c68)',
+              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)'
+            }} />
+          )}
+          
+          {gameState.deck.length > 2 && (
+            <div style={{
+              position: 'absolute',
+              top: 4,
+              left: 4,
+              width: '62px',
+              height: '92px',
+              backgroundColor: '#fff',
+              borderRadius: '4px',
+              background: 'linear-gradient(45deg, #d40000, #1c8c68)',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.1)'
+            }} />
+          )}
+        </div>
+        
+        {/* Козырь - повернутая карта под колодой */}
+        <div style={{ 
+          position: 'relative',
+          marginLeft: '-35px' // Наложение на колоду
+        }}>
+          <div style={{
+            transform: 'rotate(90deg)',
+            transformOrigin: 'center'
+          }}>
+            <Card 
+              value={gameState.trumpCard.value} 
+              suit={gameState.trumpCard.suit} 
+              style={{
+                border: '2px solid gold',
+                boxShadow: '0 0 10px gold'
+              }}
+            />
+          </div>
+        </div>
+      </div>
+      <div style={{ 
+        fontSize: '14px', 
+        color: '#ffcc00',
+        marginTop: '5px'
+      }}>
+        Осталось карт: {gameState.deck.length}
+      </div>
+    </div>
+  );
+}, [gameState]);
+
     const handleBetResult = (result) => {
       console.log('Результат ставки:', result);
       if (result.success) {
