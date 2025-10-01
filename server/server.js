@@ -64,6 +64,27 @@ const getCardValue = (value) => {
   return values[value] || 0;
 };
 
+// Функция для проверки, может ли карта побить другую карту
+const canCardBeat = (card, targetCard, trumpSuit) => {
+  // Если карта - козырь, а целевая карта - нет, то может побить
+  if (card.suit === trumpSuit && targetCard.suit !== trumpSuit) {
+    return true;
+  }
+  
+  // Если обе карты одной масти, сравниваем значения
+  if (card.suit === targetCard.suit) {
+    return getCardValue(card.value) > getCardValue(targetCard.value);
+  }
+  
+  // Если карта не козырь, а целевая карта - козырь, то не может побить
+  if (card.suit !== trumpSuit && targetCard.suit === trumpSuit) {
+    return false;
+  }
+  
+  // Карты разных мастей, и ни одна не козырь - не может побить
+  return false;
+};
+
 // Игровые комнаты
 const rooms = new Map();
 // Подключенные пользователи
@@ -124,25 +145,66 @@ function sendRoomsList(targetSocket = null) {
   }
 }
 
-// Функция для проверки, может ли карта побить другую карту
-const canCardBeat = (card, targetCard, trumpSuit) => {
-  // Если карта - козырь, а целевая карта - нет, то может побить
-  if (card.suit === trumpSuit && targetCard.suit !== trumpSuit) {
-    return true;
+// Функция для добора карт игрокам
+const refillPlayersCards = (room) => {
+  room.players.forEach(player => {
+    while (player.cards.length < 6 && room.deck.length > 0) {
+      player.cards.push(room.deck.shift());
+    }
+  });
+};
+
+// Функция для завершения раунда и смены ролей
+const completeRound = (room, winnerIndex) => {
+  // Очищаем стол
+  room.table = [];
+  
+  // Добираем карты
+  refillPlayersCards(room);
+  
+  // Определяем нового атакующего и защищающегося
+  if (winnerIndex !== -1) {
+    // Победитель раунда становится атакующим
+    room.currentPlayer = winnerIndex;
+    room.defenderIndex = (winnerIndex + 1) % 2;
+  } else {
+    // Если победителя нет (ничья), меняем роли
+    room.currentPlayer = room.defenderIndex;
+    room.defenderIndex = (room.defenderIndex + 1) % 2;
   }
   
-  // Если обе карты одной масти, сравниваем значения
-  if (card.suit === targetCard.suit) {
-    return getCardValue(card.value) > getCardValue(targetCard.value);
-  }
+  room.gamePhase = 'attacking';
   
-  // Если карта не козырь, а целевая карта - козырь, то не может побить
-  if (card.suit !== trumpSuit && targetCard.suit === trumpSuit) {
-    return false;
-  }
+  // Проверяем конец игры
+  checkGameEnd(room);
+};
+
+// Функция для проверки окончания игры
+const checkGameEnd = (room) => {
+  // Если у одного из игроков закончились карты и в колоде пусто
+  const player1Cards = room.players[0].cards.length;
+  const player2Cards = room.players[1].cards.length;
+  const deckEmpty = room.deck.length === 0;
   
-  // Карты разных мастей, и ни одна не козырь - не может побить
-  return false;
+  if (deckEmpty && (player1Cards === 0 || player2Cards === 0)) {
+    // Определяем победителя
+    let winnerIndex = -1;
+    if (player1Cards === 0 && player2Cards > 0) {
+      winnerIndex = 0;
+    } else if (player2Cards === 0 && player1Cards > 0) {
+      winnerIndex = 1;
+    }
+    // Если у обоих 0 карт - ничья
+    
+    room.gamePhase = 'finished';
+    room.winner = winnerIndex;
+    
+    // Отправляем уведомление о конце игры
+    io.to(room.id).emit('game_finished', {
+      winner: winnerIndex,
+      winnerName: winnerIndex !== -1 ? room.players[winnerIndex].name : 'Ничья'
+    });
+  }
 };
 
 // Обработка подключений WebSocket
@@ -216,7 +278,7 @@ io.on('connection', (socket) => {
       
       const roomId = Math.random().toString(36).substring(2, 8);
       const deck = shuffleDeck(generateDeck());
-      const trumpCard = deck[0];
+      const trumpCard = deck[deck.length - 1]; // Берем последнюю карту как козырь
       
       const room = {
         id: roomId,
@@ -225,10 +287,10 @@ io.on('connection', (socket) => {
           id: socket.id,
           name: user.name,
           mafs: user.mafs,
-          cards: deck.slice(1, 7),
+          cards: deck.slice(0, 6), // Первые 6 карт
           isActive: true
         }],
-        deck: deck.slice(13),
+        deck: deck.slice(6, deck.length - 1), // Остальные карты кроме козыря
         trumpCard,
         table: [],
         currentPlayer: 0, // Индекс атакующего игрока
@@ -236,6 +298,7 @@ io.on('connection', (socket) => {
         betAmount: 100,
         gameStarted: false,
         gamePhase: 'waiting',
+        attacksCount: 0, // Количество атак в текущем раунде
         createdAt: new Date().toISOString()
       };
       
@@ -293,6 +356,7 @@ io.on('connection', (socket) => {
       
       // Устанавливаем защищающегося игрока (второй игрок)
       room.defenderIndex = 1;
+      room.currentPlayer = 0; // Первый игрок атакует
       
       room.gamePhase = 'betting';
       room.gameStarted = true;
@@ -387,9 +451,10 @@ io.on('connection', (socket) => {
         return;
       }
       
-      // Если это первая атака, проверяем, что карта может быть использована для атаки
+      // Если это первая атака, можно использовать любую карту
       if (room.table.length === 0) {
         // Для первой атаки можно использовать любую карту
+        room.attacksCount = 1;
       } else {
         // Для последующих атак карта должна совпадать по достоинству с одной из карт на столе
         const canAddToAttack = room.table.some(item => 
@@ -400,6 +465,7 @@ io.on('connection', (socket) => {
           socket.emit('error', { message: 'Можно подкидывать только карты того же достоинства, что уже есть на столе' });
           return;
         }
+        room.attacksCount++;
       }
       
       // Убираем карту из руки игрока
@@ -448,12 +514,20 @@ io.on('connection', (socket) => {
       }
       
       const player = room.players[playerIndex];
-      // Берем последнюю атакующую карту
-      const attackingCards = room.table.filter(item => item.type === 'attack');
-      const lastAttackCard = attackingCards[attackingCards.length - 1].card;
+      
+      // Находим последнюю неотбитую атакующую карту
+      const attackCards = room.table.filter(item => item.type === 'attack');
+      const defenseCards = room.table.filter(item => item.type === 'defense');
+      
+      if (defenseCards.length >= attackCards.length) {
+        socket.emit('error', { message: 'Все атаки уже отбиты' });
+        return;
+      }
+      
+      const targetAttackCard = attackCards[defenseCards.length].card;
       
       // Проверяем, может ли карта побить атакующую
-      const canBeat = canCardBeat(card, lastAttackCard, room.trumpCard.suit);
+      const canBeat = canCardBeat(card, targetAttackCard, room.trumpCard.suit);
       
       if (!canBeat) {
         socket.emit('error', { message: 'Эта карта не может побить атакующую' });
@@ -470,7 +544,7 @@ io.on('connection', (socket) => {
         return;
       }
       
-      // Убираем карта из руки игрока
+      // Убираем карту из руки игрока
       player.cards.splice(cardIndex, 1);
       
       // Добавляем карту на стол
@@ -481,12 +555,9 @@ io.on('connection', (socket) => {
       });
       
       // Проверяем, все ли атаки отбиты
-      const attackCardsCount = room.table.filter(item => item.type === 'attack').length;
-      const defenseCardsCount = room.table.filter(item => item.type === 'defense').length;
-      
-      if (attackCardsCount === defenseCardsCount) {
+      if (room.table.filter(item => item.type === 'defense').length === room.attacksCount) {
         // Все атаки отбиты, можно завершить раунд
-        room.gamePhase = 'attacking';
+        room.gamePhase = 'round_end';
       }
       
       // Отправляем обновление игры
@@ -521,6 +592,16 @@ io.on('connection', (socket) => {
         return;
       }
       
+      // Проверяем, что у защищающегося достаточно карт для отбития
+      const defender = room.players[room.defenderIndex];
+      const currentAttacks = room.table.filter(item => item.type === 'attack').length;
+      const currentDefenses = room.table.filter(item => item.type === 'defense').length;
+      
+      if (currentAttacks - currentDefenses >= defender.cards.length) {
+        socket.emit('error', { message: 'Нельзя подкидывать больше карт, чем есть у защищающегося' });
+        return;
+      }
+      
       const player = room.players[playerIndex];
       // Проверяем, есть ли карта у игрока
       const cardIndex = player.cards.findIndex(c => 
@@ -552,6 +633,8 @@ io.on('connection', (socket) => {
         type: 'attack'
       });
       
+      room.attacksCount++;
+      
       // Отправляем обновление игры
       io.to(roomId).emit('game_update', room);
       
@@ -579,20 +662,13 @@ io.on('connection', (socket) => {
         return;
       }
       
-      // Завершаем раунд
-      room.table = [];
-      room.gamePhase = 'attacking';
+      if (room.gamePhase !== 'defending' && room.gamePhase !== 'round_end') {
+        socket.emit('error', { message: 'Сейчас нельзя завершить раунд' });
+        return;
+      }
       
-      // Меняем роли игроков: защищавшийся становится атакующим
-      room.currentPlayer = room.defenderIndex;
-      room.defenderIndex = (room.defenderIndex + 1) % room.players.length;
-      
-      // Добираем карты
-      room.players.forEach(player => {
-        while (player.cards.length < 6 && room.deck.length > 0) {
-          player.cards.push(room.deck.shift());
-        }
-      });
+      // Завершаем раунд - защищающийся успешно отбился
+      completeRound(room, room.defenderIndex);
       
       // Отправляем обновление игры
       io.to(roomId).emit('game_update', room);
@@ -633,19 +709,8 @@ io.on('connection', (socket) => {
         defender.cards.push(item.card);
       });
       
-      // Очищаем стол
-      room.table = [];
-      
-      // Переход хода к следующему игроку (атакующему)
-      room.gamePhase = 'attacking';
-      // Атакующий остается прежним
-      
-      // Добираем карты
-      room.players.forEach(player => {
-        while (player.cards.length < 6 && room.deck.length > 0) {
-          player.cards.push(room.deck.shift());
-        }
-      });
+      // Завершаем раунд - защищающийся взял карты
+      completeRound(room, room.currentPlayer);
       
       // Отправляем обновление игры
       io.to(roomId).emit('game_update', room);
@@ -657,7 +722,7 @@ io.on('connection', (socket) => {
     }
   });
   
-  // Пас
+  // Пас (передача хода)
   socket.on('pass', (roomId) => {
     try {
       const room = rooms.get(roomId);
@@ -678,14 +743,15 @@ io.on('connection', (socket) => {
         return;
       }
       
+      // Если на столе есть карты, нельзя пасовать
+      if (room.table.length > 0) {
+        socket.emit('error', { message: 'Нельзя пасовать, когда на столе есть карты' });
+        return;
+      }
+      
       // Переход хода к защищавшемуся игроку
       room.currentPlayer = room.defenderIndex;
       room.defenderIndex = (room.defenderIndex + 1) % room.players.length;
-      
-      // Если стол пустой, начинаем новую атаку
-      if (room.table.length === 0) {
-        room.gamePhase = 'attacking';
-      }
       
       // Отправляем обновление игры
       io.to(roomId).emit('game_update', room);
